@@ -1,17 +1,17 @@
 # Chatbot en CLI con historial de conversación (Parte 1)
 
-> **Aviso de privacidad y procedencia:** Esta guía es un documento de estudio **autónomo y original**. No reproduce la transcripción de ningún curso de pago ni el código de terceros. No incluye identificadores de cuentas/proyectos, URLs de medios (p. ej. Wistia), metadatos de respuesta, marcas de tiempo, nombres de archivo, claves de API, identificadores de respuesta, tarifas privadas, rutas personales ni nombres de host. Los fragmentos de código son planificados (PLANNED) y no se han ejecutado.
+> **Aviso de privacidad y procedencia:** Esta guía es un documento de estudio **autónomo y original**. No reproduce la transcripción de ningún curso de pago ni el código de terceros. No incluye identificadores de cuentas/proyectos, URLs de medios (p. ej. Wistia), metadatos de respuesta, marcas de tiempo, nombres de archivo, claves de API, identificadores de respuesta, tarifas privadas, rutas personales ni nombres de host. Los fragmentos reflejan la implementación verificada; no se realizó una llamada real a la API para esta lección.
 >
 > **Fuente externa de arranque (OpenAI), no copiar:** se usa un Gist público de OpenAI solo como punto de partida conceptual (enlace **volátil**, citado una vez en Referencias externas oficiales; puede cambiar o desaparecer). Esta guía es **autónoma y original**: no reproduce ese Gist ni el material del curso de pago.
 
 ## Estado
 
-**Planned** — lección de la sección 2 (Parte 1 de la historia de conversación). Prerrequisitos:
+**Completed** — lección de la sección 2 (Parte 1 de la historia de conversación). Prerrequisitos:
 
 - [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) **completado e implementado** (define `call_ai`, el límite de errores y el patrón de cliente inyectado).
 - [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md) **revisado/completado conceptualmente antes de implementar** (temperatura, semilla, límites de cuota).
 
-El código aquí descrito es un **plan**: no está implementado, no existe `src/python_applied_ai/chatbot_cli.py`, y no se ha ejecutado `ruff`/`mypy`/`pytest` sobre él. No debe marcarse como terminado.
+La implementación está en `src/python_applied_ai/chatbot_cli.py` y sus pruebas offline en `tests/test_chatbot_cli.py`. Evidencia verificada: `ruff format --check .` y `ruff check src tests` limpios; `mypy src tests` sin errores en 9 archivos; `pytest tests/test_chatbot_cli.py -q` = 5 passed; suite completa = 19 passed. No se hizo llamada en vivo: la validación de esta Parte 1 es offline.
 
 ## Roadmap del proyecto (tres videos)
 
@@ -19,7 +19,7 @@ El proyecto de chatbot en CLI abarca **tres videos** del curso. Esta guía (02-0
 
 | Guía | Video | Título de trabajo (provisional) | Contenido exacto |
 | --- | --- | --- | --- |
-| 02-08 (esta) | Video 1 | Clase de dominio con historial | Definido en esta guía (Planned) |
+| 02-08 (esta) | Video 1 | Clase de dominio con historial | Implementado y verificado offline |
 | 02-09 | Video 2 | Costo y estadísticas de sesión | Pendiente de transcripción |
 | 02-10 | Video 3 | Bucle de CLI e integración final | Pendiente de transcripción |
 
@@ -29,7 +29,7 @@ El proyecto de chatbot en CLI abarca **tres videos** del curso. Esta guía (02-0
 
 1. (Hecho) [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) — cliente inyectado y manejo de errores.
 2. (Hecho) [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md) — parámetros de muestreo y conciencia de cuota.
-3. **(Planned) Esta Parte 1:** crear la clase de dominio `ChatBot` con `history` tipado y `chat()` transaccional.
+3. **(Hecho) Esta Parte 1:** crear la clase de dominio `ChatBot` con `history` tipado y `chat()` transaccional.
 4. **(Diferido, a confirmar con transcripciones):** el seguimiento de costo/estadísticas de sesión se reserva para **02-09** y el bucle de CLI de integración final para **02-10** (títulos de trabajo; el material exacto llega con los videos 2 y 3).
 
 **Resultado de esta lección:** un objeto `ChatBot` que recuerda la conversación (system + user + assistant) y la reenvía en cada turno, con errores de Groq que se propagan al límite, igual que en 02-06.
@@ -91,15 +91,14 @@ No copie el acoplamiento OpenAI, los efectos de `dotenv`, el modelo/tarifas hard
 - **Estrategias futuras (para 02-09+), no promesas de esta lección:** ventanas de contexto, resumen/compresión de historial, persistencia en disco, e integración RAG. Evite afirmar que "RAG por sí solo resuelve toda la historia".
 - **No reclame determinismo.** La temperatura (02-07) no garantiza salidas idénticas; el historial solo cambia el contexto enviado.
 
-## Plan de arquitectura (no implementado)
+## Arquitectura implementada y verificada
 
-> Todo fragmento de esta sección es **PLANNED / pseudocódigo**. No existe aún.
+> Los fragmentos de esta sección reflejan `src/python_applied_ai/chatbot_cli.py`. El dominio no imprime, no captura errores ni crea un bucle CLI.
 
 ### Contrato de la clase
 
 ```python
-# PLANNED (pseudocódigo): src/python_applied_ai/chatbot_cli.py
-# No existe aún. Se añade en esta lección (Parte 1).
+# src/python_applied_ai/chatbot_cli.py
 
 
 class ChatBot:
@@ -143,18 +142,11 @@ Decisión del análisis aprobado: si `response.choices[0].message.content` es `N
 - El costo usa `Decimal` (en `cost.py`), **nunca `float`**, para evitar errores de redondeo de moneda. Las tarifas son `Decimal | None` opcionales en `Settings`; hoy no se exige su configuración.
 - Añadir contadores "muertos" aquí duplicaría responsabilidad y rompería el límite de la lección.
 
-### `chatbot_cli.py` (PLANNED/PSEUDOCODE)
+### `chatbot_cli.py` (implementación)
 
 ```python
-# PLANNED (pseudocódigo): src/python_applied_ai/chatbot_cli.py
-# No existe aún. Etiquetado PLANNED; no se ha ejecutado ruff/mypy/pytest.
-# Mantener la clase de dominio SIN print/SystemExit (el bucle CLI es alcance de 02-10, por confirmar).
-
-from __future__ import annotations
-
 from groq import Groq
 from groq.types.chat import (
-    ChatCompletion,
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageParam,
     ChatCompletionSystemMessageParam,
@@ -163,63 +155,33 @@ from groq.types.chat import (
 
 from python_applied_ai.config import Settings
 
-TEMPERATURE = 0.7
-TOP_P = 0.9
-
 
 class ChatBot:
-    """Domain chatbot that keeps a typed conversation history.
-
-    The client and settings are injected so tests can pass a fake client
-    with zero network and zero quota. Errors from Groq propagate to the
-    CLI boundary (consistent with 02-06).
-    """
+    """Maintain one CLI chatbot session in memory."""
 
     def __init__(self, client: Groq, settings: Settings, system_prompt: str) -> None:
-        self._client = client
-        self._settings = settings
-        self._system_prompt = system_prompt
-
-        system_message: ChatCompletionSystemMessageParam = {
-            "role": "system",
-            "content": system_prompt,
-        }
-        # history starts with the system message only.
-        self.history: list[ChatCompletionMessageParam] = [system_message]
+        self.client = client
+        self.settings = settings
+        self.history: list[ChatCompletionMessageParam] = [
+            ChatCompletionSystemMessageParam(role="system", content=system_prompt)
+        ]
 
     def chat(self, user_message: str) -> str:
-        """Send a user turn and return the assistant reply.
-
-        Builds the pending payload without mutating history, calls Groq,
-        and only commits user+assistant after a successful non-exception
-        response. Groq errors propagate to the CLI boundary.
-        """
-        user_param: ChatCompletionUserMessageParam = {
-            "role": "user",
-            "content": user_message,
-        }
-        # pending is a NEW list; self.history is untouched until success.
-        pending: list[ChatCompletionMessageParam] = [*self.history, user_param]
-
-        response: ChatCompletion = self._client.chat.completions.create(
-            model=self._settings.llm_model,
-            messages=pending,
-            max_tokens=self._settings.llm_max_tokens,  # migrar a max_completion_tokens en 02-09+
-            temperature=TEMPERATURE,
-            top_p=TOP_P,
+        """Send one message and commit a successful conversation round."""
+        user_entry = ChatCompletionUserMessageParam(role="user", content=user_message)
+        pending_history: list[ChatCompletionMessageParam] = [*self.history, user_entry]
+        response = self.client.chat.completions.create(
+            model=self.settings.llm_model,
+            messages=pending_history,
+            max_tokens=self.settings.llm_max_tokens,
+            temperature=0.7,
+            top_p=0.9,
         )
-
-        raw_content = response.choices[0].message.content
-        assistant_content = "" if raw_content is None else raw_content
-
-        assistant_param: ChatCompletionAssistantMessageParam = {
-            "role": "assistant",
-            "content": assistant_content,
-        }
-        # Commit ONLY after a successful, non-exception response.
-        self.history.append(user_param)
-        self.history.append(assistant_param)
-        return assistant_content
+        content = response.choices[0].message.content or ""
+        assistant_entry = ChatCompletionAssistantMessageParam(role="assistant", content=content)
+        self.history.append(user_entry)
+        self.history.append(assistant_entry)
+        return content
 ```
 
 > El `system_prompt` se pasa al instanciar (p. ej. `ChatBot(client, settings, "<tu instrucción de sistema en español>")`). **No se incluye aquí el texto original del curso ni del Gist**; use su propia redacción.
@@ -237,7 +199,7 @@ Cero llamadas reales a la API. Patrón **AAA** (Arrange – Act – Assert):
 El tipo real `ChatCompletion` es complejo. Para mantener mypy strict plausible sin mecanografía completa, se usa `MagicMock` con `cast(ChatCompletion, ...)`:
 
 ```python
-# PLANNED (pseudocódigo): helper de respuesta en tests/test_chatbot_cli.py
+# tests/test_chatbot_cli.py — helper de respuesta offline.
 from typing import cast
 from unittest.mock import MagicMock
 from groq.types.chat import ChatCompletion
@@ -258,7 +220,7 @@ def _fake_completion(content: str | None) -> ChatCompletion:
 El helper de error de conexión reusa el de 02-06 (request en memoria, sin red):
 
 ```python
-# PLANNED (pseudocódigo): reusa el patrón verificado de 02-06.
+# tests/test_chatbot_cli.py — patrón de error verificado en 02-06.
 import httpx
 from groq import APIConnectionError
 
@@ -274,41 +236,38 @@ def _connection_error() -> APIConnectionError:
 El helper de `Settings` (solo tests) también reusa 02-06:
 
 ```python
-# PLANNED (pseudocódigo): Settings de confianza, sin .env ni red.
-from typing import cast
-from pydantic import SecretStr
+# tests/test_chatbot_cli.py — Settings de confianza, sin .env ni red.
 from python_applied_ai.config import Settings
 
 
-def _test_settings(
-    *,
-    groq_api_key: SecretStr | None = None,
-    llm_model: str = "openai/gpt-oss-20b",
-    llm_max_tokens: int = 256,
-) -> Settings:
+def _test_settings() -> Settings:
     return Settings.model_construct(
-        groq_api_key=groq_api_key,
-        llm_model=llm_model,
-        llm_max_tokens=llm_max_tokens,
+        llm_model="openai/gpt-oss-20b",
+        llm_max_tokens=256,
     )
 ```
 
-### `tests/test_chatbot_cli.py` (PLANNED/PSEUDOCODE)
+`Settings.model_construct` está confinado a `tests/`: construye un fixture de confianza sin validar ni cargar fuentes de entorno. No debe usarse en `src/`.
+
+### `tests/test_chatbot_cli.py` (implementación offline)
 
 ```python
-# PLANNED (pseudocódigo): tests/test_chatbot_cli.py — offline, AAA.
-# No existe aún. Cero red, cero cuota, cero .env.
+# tests/test_chatbot_cli.py — offline, AAA; cero red, cuota y .env.
 from typing import cast
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
 from groq import APIConnectionError, Groq
 from groq.types.chat import (
+    ChatCompletion,
     ChatCompletionAssistantMessageParam,
     ChatCompletionSystemMessageParam,
+    ChatCompletionUserMessageParam,
 )
 
 from python_applied_ai.chatbot_cli import ChatBot
+from python_applied_ai.config import Settings
 
 SYSTEM_PROMPT = "<tu instrucción de sistema en español>"  # placeholder, no copiado
 
@@ -355,16 +314,22 @@ def test_first_round_roundtrips_history() -> None:
 def test_second_round_sends_full_context() -> None:
     settings = _test_settings()
     fake_client = MagicMock()
-    fake_client.chat.completions.create.return_value = _fake_completion("Ok")
+    fake_client.chat.completions.create.side_effect = [
+        _fake_completion("First reply"),
+        _fake_completion("Second reply"),
+    ]
 
     bot = ChatBot(cast(Groq, fake_client), settings, SYSTEM_PROMPT)
-    bot.chat("Primero")
-    bot.chat("Segundo")
+    bot.chat("First question")
+    bot.chat("Second question")
 
-    _, kwargs = fake_client.chat.completions.create.call_args
-    sent = kwargs["messages"]
-    assert len(sent) == 4
-    assert [m["role"] for m in sent] == ["system", "user", "assistant", "user"]
+    second_call = fake_client.chat.completions.create.call_args_list[1]
+    assert second_call.kwargs["messages"] == [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": "First question"},
+        {"role": "assistant", "content": "First reply"},
+        {"role": "user", "content": "Second question"},
+    ]
 
 
 # T4: APIConnectionError se propaga y el historial queda sin cambios.
@@ -403,10 +368,10 @@ def test_empty_content_returns_empty_string_and_commits() -> None:
 ## Procedimiento manual de aprendizaje
 
 1. Confirme [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) implementado y [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md) revisado.
-2. Cree `src/python_applied_ai/chatbot_cli.py` con la clase `ChatBot` (plan arriba).
-3. Cree `tests/test_chatbot_cli.py` con T1–T5 (offline).
-4. Ejecute `ruff format --check .`, `ruff check .`, `mypy src tests --strict`, `pytest` (debe estar en verde antes de tocar la API).
-5. Solo para confirmación en vivo (cuota real): una sola llamada exitosa; **nunca** provoque errores a propósito.
+2. Revise `src/python_applied_ai/chatbot_cli.py`: la clase `ChatBot` ya implementa el contrato anterior.
+3. Revise `tests/test_chatbot_cli.py`: T1–T5 son pruebas offline de comportamiento y caracterización.
+4. Ejecute `ruff format --check .`, `ruff check src tests`, `mypy src tests`, `pytest tests/test_chatbot_cli.py -q` y `pytest -q`.
+5. Una llamada en vivo es opcional y consume cuota; no se ejecutó para esta Parte 1 y nunca se deben provocar errores a propósito.
 
 ## Observaciones esperadas (sin prometer salidas exactas)
 
@@ -434,16 +399,16 @@ def test_empty_content_returns_empty_string_and_commits() -> None:
 
 ## Checklist de aceptación
 
-- [ ] `ChatBot.__init__(client: Groq, settings: Settings, system_prompt: str)` inyecta cliente y settings.
-- [ ] `history` empieza en `[system]` (rol `system`, contenido = `system_prompt`).
-- [ ] `chat` construye `pending` sin mutar `history` y confirma user+assistant solo tras éxito.
-- [ ] `chat` usa `settings.llm_model`, `settings.llm_max_tokens`, `temperature=0.7`, `top_p=0.9`.
-- [ ] Los errores de Groq se propagan al límite (no se capturan en dominio).
-- [ ] `content is None` → devuelve `""` y confirma assistant con `""` (contrato T5).
-- [ ] Sin `total_tokens`/`total_cost` muertos; costo futuro con `Decimal` en 02-09.
-- [ ] Pruebas T1–T5 offline (MagicMock/`cast`, `Settings.model_construct`); cero red/cuota.
-- [ ] `ruff format --check .`, `ruff check .`, `mypy src tests --strict`, `pytest` en verde al implementar.
-- [ ] No se copió código del Gist ni del curso de pago.
+- [x] `ChatBot.__init__(client: Groq, settings: Settings, system_prompt: str)` inyecta cliente y settings.
+- [x] `history` empieza en `[system]` (rol `system`, contenido = `system_prompt`).
+- [x] `chat` construye `pending` sin mutar `history` y confirma user+assistant solo tras éxito.
+- [x] `chat` usa `settings.llm_model`, `settings.llm_max_tokens`, `temperature=0.7`, `top_p=0.9`.
+- [x] Los errores de Groq se propagan al límite (no se capturan en dominio).
+- [x] `content is None` → devuelve `""` y confirma assistant con `""` (contrato T5).
+- [x] Sin `total_tokens`/`total_cost` muertos; costo futuro con `Decimal` en 02-09.
+- [x] Pruebas T1–T5 offline (MagicMock/`cast`, `Settings.model_construct`); cero red/cuota.
+- [x] Verificado con `ruff format --check .`, `ruff check src tests`, `mypy src tests`, 5 pruebas dirigidas y 19 pruebas totales.
+- [x] No se copió código del Gist ni del curso de pago.
 
 ## Comandos de verificación
 
@@ -453,8 +418,8 @@ uv run ruff check .
 uv run mypy src tests --strict
 uv run pytest tests/test_chatbot_cli.py -q
 uv run pytest -q
-# Confirmación en vivo (cuota real, una sola llamada; fuera de la automatización):
-uv run python -m python_applied_ai.chatbot_cli  # PLANNED, no existe aún
+# Confirmación en vivo (opcional, consume cuota; no ejecutada en esta Parte 1):
+# El módulo no ofrece aún un bucle CLI ejecutable; se difiere a 02-10.
 ```
 
 ## Rollback / límite de parada
@@ -466,7 +431,7 @@ uv run python -m python_applied_ai.chatbot_cli  # PLANNED, no existe aún
 
 ## Siguiente paso
 
-Implemente esta Parte 1 (`ChatBot`) y sus pruebas offline. Luego continúe con **02-09** (título de trabajo: costo y estadísticas de sesión, video 2, por confirmar con transcripción) y **02-10** (título de trabajo: bucle de CLI e integración final, video 3, por confirmar). No adelante aquí su implementación.
+Esta Parte 1 (`ChatBot` e historial) está completada y verificada offline. Se espera la transcripción del video 2 antes de definir **02-09** y la del video 3 antes de definir **02-10**. No adelante aquí su implementación.
 
 ## Referencias externas oficiales
 
