@@ -4,7 +4,7 @@
 
 ## Estado
 
-**Implementación: Completed; Documentación: Completed; Cierre Git local (commit): Completed** — el prerrequisito [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) está completo (llamada en vivo Groq + tarea de tres lenguas). Tanto la fase **requerida** (reporte de tokens/metadatos sobre el MISMO `response`) como la fase **opcional** (estimación de costo `Decimal` en `cost.py` + `tests/test_cost.py`) están **implementadas y verificadas en vivo**. `report_usage(response, settings)` imprime `response.id`, `response.model`, `response.usage` y una estimación teórica de costo, con guardas `is None` para `usage` y `completion_tokens_details`, y la función pura `estimate_cost_usd(...)` recibe las tarifas por parámetro con guardas contra valores negativos. Las tarifas opcionales tipadas se configuran mediante los placeholders en blanco `LLM_INPUT_RATE_PER_MILLION=` / `LLM_OUTPUT_RATE_PER_MILLION=` de `.env.example` (decisión #8684); los valores reales privados viven solo en `.env` ignorado por Git; no hay precios numéricos rastreados ni hardcodeados. **Cierre Git local realizado en `d35af37`** (`feat: add Groq token usage, cost estimation, and course notes`), que incluye el código y esta nota de estudio. **La sincronización remota está pendiente**: `origin/main` está actualmente un commit por detrás de `main` local; el `push` aún no se ha ejecutado.
+**Implementación: Completed; Documentación: Completed; Cierre Git local y remoto: Completed** — el prerrequisito [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) está completo (llamada en vivo Groq + tarea de tres lenguas). Tanto la fase **requerida** (reporte de tokens/metadatos sobre el MISMO `response`) como la fase **opcional** (estimación de costo `Decimal` en `cost.py` + `tests/test_cost.py`) están **implementadas y verificadas en vivo**. `report_usage(response, settings)` imprime `response.id`, `response.model`, `response.usage` y una estimación teórica de costo, con guardas `is None` para `usage` y `completion_tokens_details`, y la función pura `estimate_cost_usd(...)` recibe las tarifas por parámetro con guardas contra valores negativos. Las tarifas opcionales tipadas se configuran mediante los placeholders en blanco `LLM_INPUT_RATE_PER_MILLION=` / `LLM_OUTPUT_RATE_PER_MILLION=` de `.env.example` (decisión #8684); los valores reales privados viven solo en `.env` ignorado por Git; no hay precios numéricos rastreados ni hardcodeados. **Cierre Git local y remoto completado**: los commits `d35af37` (`feat: add Groq token usage, cost estimation, and course notes`, que incluye el código y esta nota de estudio) y `1093d06` ya están publicados en `origin/main`. Siguiente lección: [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md).
 
 ## Objetivo de aprendizaje
 
@@ -296,19 +296,11 @@ Ejecución en vivo con modelo `openai/gpt-oss-20b` (modelo de razonamiento) sobr
 
 ## Estado actual y siguiente paso
 
-La fase **requerida** (reporte de tokens/metadatos con `report_usage(response, settings)`) y la fase **opcional** (estimación de costo `Decimal` en `cost.py` + `tests/test_cost.py`, 7 pruebas) están **completadas y verificadas en vivo**; el repositorio completo pasa 8 pruebas en total (7 de `tests/test_cost.py` + 1 preexistente `tests/test_package.py`).; el prerrequisito [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) sigue completo. **Implementación, documentación y cierre Git local completados** en el commit `d35af37` (`feat: add Groq token usage, cost estimation, and course notes`). **La sincronización remota está pendiente**: `origin/main` está un commit por detrás de `main` local; el `push` no se ha ejecutado. **El siguiente paso es commitear esta corrección de documentación, luego hacer `push` de ambos commits, y a continuación iniciar** [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) (manejo tipado y testeable de errores de la API de Groq), que se mantiene **Planned** y secuenciada después de este paso.
+La fase **requerida** (reporte de tokens/metadatos con `report_usage(response, settings)`) y la fase **opcional** (estimación de costo `Decimal` en `cost.py` + `tests/test_cost.py`, 7 pruebas) están **completadas y verificadas en vivo**; el repositorio completo pasa 8 pruebas en total (7 de `tests/test_cost.py` + 1 preexistente `tests/test_package.py`). El prerrequisito [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) sigue completo. **Implementación, documentación y sincronización Git local+remota completadas**: los commits `d35af37` (`feat: add Groq token usage, cost estimation, and course notes`) y `1093d06` ya están publicados en `origin/main`. **La siguiente lección es** [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) (manejo tipado y testeable de errores de la API de Groq), que se mantiene **Planned** y secuenciada después de este paso.
 
 ## Mensaje de commit sugerido
 
-El cierre de la lección ya se realizó en `d35af37` (`feat: add Groq token usage, cost estimation, and course notes`), que incluye el código y esta nota de estudio. La reconciliación de estado de este documento con `d35af37` queda pendiente de su propio commit.
-
-Para esta corrección de documentación:
-
-```text
-docs: reconcile 02-05 status with local commit d35af37
-```
-
-**La sincronización remota sigue pendiente**: `origin/main` está un commit por detrás de `main` local. Tras commitear esta corrección, haga `push` de ambos commits (`d35af37` y la corrección) y luego inicie [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md).
+El cierre de la lección ya está publicado en `origin/main` mediante los commits `d35af37` (`feat: add Groq token usage, cost estimation, and course notes`) y `1093d06`, que incluyen el código y esta nota de estudio. No quedan pasos de `push` pendientes; la siguiente lección es [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md).
 
 ## Referencias externas oficiales
 

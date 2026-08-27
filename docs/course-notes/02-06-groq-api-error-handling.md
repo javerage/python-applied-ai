@@ -4,7 +4,7 @@
 
 ## Estado
 
-**Planned** — lección de la sección 2 secuenciada **después** del paso opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md). El código aquí descrito es un **plan**: no está implementado, no se ha ejecutado `ruff`/`mypy`/`pytest` sobre él, y no debe marcarse como terminado. Solo se verificaron las firmas de los constructores de excepciones contra el paquete `groq` instalado (v1.7.0).
+**Planned** — lección de la sección 2 secuenciada **después** del paso opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (ya completado y sincronizado con `origin/main` en los commits `d35af37` y `1093d06`). El código aquí descrito es un **plan**: no está implementado, no se ha ejecutado `ruff`/`mypy`/`pytest` sobre él, y no debe marcarse como terminado. Solo se verificaron las firmas de los constructores de excepciones contra el paquete `groq` instalado (v1.7.0).
 
 ## Objetivo de aprendizaje
 
@@ -13,7 +13,7 @@ Convertir la función de dominio de la primera llamada en una unidad tipada y te
 ## Ruta rápida
 
 1. (Hecho) Completar [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) — `config.py` y `hello_ai.py` funcionando.
-2. (Pendiente) Completar la fase opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (`cost.py` + `tests/test_cost.py`) antes de esta lección.
+2. (Hecho) La fase opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (`cost.py` + `tests/test_cost.py`) ya está completa y sincronizada (commits `d35af37` y `1093d06` publicados).
 3. (Planned) Refactorizar `hello_ai.py`: añadir `call_ai(client, question, settings) -> ChatCompletion` que devuelve la respuesta completa; `main` captura excepciones y presenta mensajes amigables.
 4. (Planned) Añadir `tests/` que fuerzan fallos de auth/rate-limit/not-found/connection con un cliente falso (`MagicMock`) y un helper seguro de excepciones.
 5. (Planned) Verificar con `ruff format .`, `ruff check .`, `mypy src` (strict) y `pytest`.
@@ -50,7 +50,7 @@ Mantener **un solo módulo** `hello_ai.py` (sin duplicar en un `hello_error_mana
 def call_ai(client: Groq, question: str, settings: Settings) -> ChatCompletion: ...
 ```
 
-- **`call_ai(client, question, settings) -> ChatCompletion`**: recibe el cliente **inyectado** (tipado `Groq`), la pregunta y la configuración; devuelve la respuesta completa `ChatCompletion`. Así `report_usage(response)` y la estimación de costo de `cost.py` siguen siendo reutilizables sobre el MISMO `response`.
+- **`call_ai(client, question, settings) -> ChatCompletion`**: recibe el cliente **inyectado** (tipado `Groq`), la pregunta y la configuración; devuelve la respuesta completa `ChatCompletion`. Así `report_usage(response, settings)` y la estimación de costo de `cost.py` siguen siendo reutilizables sobre el MISMO `response`.
 - **El cliente se inyecta** para que las pruebas pasen un `MagicMock` en vez del cliente real, sin red ni cuota.
 - **No se crea un segundo archivo**: se conserva el alcance de principiante de una sola lección.
 
@@ -212,7 +212,7 @@ def main() -> None:
         print(f"Groq API error: {exc}")
         return
 
-    report_usage(response)
+    report_usage(response, settings)
 ```
 
 ## Checklist de aceptación
@@ -227,7 +227,7 @@ def main() -> None:
 - [ ] No hay bucle manual de reintentos (se usa el reintento nativo del SDK).
 - [ ] Las pruebas usan `MagicMock` con `side_effect` y el helper seguro de excepciones.
 - [ ] `uv run ruff format .`, `ruff check .`, `uv run mypy src` (strict) y `uv run pytest` en verde (al implementar).
-- [ ] El paso opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) está completo antes de esta lección.
+- [x] El paso opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) está completo y sincronizado (prerrequisito cumplido; commits `d35af37` y `1093d06` publicados).
 
 ## Comandos
 
@@ -241,8 +241,12 @@ uv run mypy src
 ## Estado actual
 
 - Lección **Planned**; no implementada.
-- La fase opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) sigue pendiente y debe completarse primero (secuencia: costo → errores).
+- La fase opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) ya está completa y sincronizada (commits `d35af37` y `1093d06` publicados); la secuencia es costo → errores → temperatura.
 - Se verificaron solo las firmas de los constructores de excepciones de `groq` 1.7.0; el código de esta lección no se ha ejecutado.
+
+## Continuidad con la siguiente lección (02-07)
+
+Esta lección (02-06, manejo tipado y testeable de errores) es **Planned** y debe implementarse antes de [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md). La lección 02-07 profundiza en `temperature`, `seed` y reproducibilidad con Groq, y asume que `call_ai(client, question, settings) -> ChatCompletion` (definida aquí en 02-06) ya existe. El experimento controlado de temperatura de 02-07 reutiliza esa misma función de dominio tipada como base; por tanto, 02-06 es prerrequisito directo de 02-07.
 
 ## Mensaje de commit sugerido
 
