@@ -1,0 +1,45 @@
+[project]
+name = "python-applied-ai"
+version = "0.1.0"
+description = "Applied AI learning portfolio with provider-neutral LLM integrations, RAG, and agentic workflows."
+readme = "README.md"
+authors = [
+    { name = "Javerage", email = "courses.javerage@gmail.com" }
+]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "groq>=1.7.0",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.15.0",
+    "rich>=15.0.0",
+]
+
+[project.scripts]
+python-applied-ai = "python_applied_ai:main"
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
