@@ -6,6 +6,7 @@ from groq import (
     APIConnectionError,
     AuthenticationError,
     Groq,
+    GroqError,
     NotFoundError,
     RateLimitError,
 )
@@ -76,6 +77,22 @@ def report_usage(
     report_theoretical_cost(usage, settings)
 
 
+def call_ai(
+    client: Groq,
+    question: str,
+    settings: Settings,
+) -> ChatCompletion:
+    """Call Groq and return the complete chat response."""
+
+    return client.chat.completions.create(
+        model=settings.llm_model,
+        messages=[{"role": "user", "content": question}],
+        max_tokens=settings.llm_max_tokens,
+        temperature=0.7,
+        top_p=0.9,
+    )
+
+
 def main() -> None:
     """Print a greeting from the LLM."""
     settings = get_settings()
@@ -87,17 +104,10 @@ def main() -> None:
     client = Groq(api_key=settings.groq_api_key.get_secret_value())
 
     try:
-        response = client.chat.completions.create(
-            model=settings.llm_model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": "Say hello in three languages: Spanish, English, and French.",
-                }
-            ],
-            max_tokens=settings.llm_max_tokens,
-            temperature=0.7,
-            top_p=0.9,
+        response = call_ai(
+            client,
+            "Say hello in three languages: Spanish, English, and French.",
+            settings,
         )
     except AuthenticationError:
         print("Authentication failed: GROQ_API_KEY is invalid or revoked.")
@@ -110,6 +120,9 @@ def main() -> None:
         return
     except APIConnectionError:
         print("Connection error: check your network and retry.")
+        return
+    except GroqError:
+        print("Unexpected Groq error. Try again later or check the Groq status page.")
         return
 
     content = response.choices[0].message.content

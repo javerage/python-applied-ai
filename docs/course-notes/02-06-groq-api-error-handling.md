@@ -1,50 +1,51 @@
 # Manejo tipado y testeable de errores de la API de Groq
 
-> **Aviso de derechos y privacidad:** Este documento es una nota de estudio independiente que resume objetivos de aprendizaje y decisiones originales de implementación. No reproduce transcripciones de cursos de pago ni material con derechos de autor. No incluye claves de API reales, datos personales ni activos de video. No contiene URLs de medios (p. ej. Wistia) ni tokens con aspecto de `gsk_`.
+> **Aviso de derechos y privacidad:** Este documento es una nota de estudio independiente que resume objetivos de aprendizaje y decisiones de implementación ya verificadas. No reproduce transcripciones de cursos de pago ni material con derechos de autor. No incluye claves de API reales, datos personales ni activos de video. No contiene URLs de medios (p. ej. Wistia) ni tokens con aspecto de `gsk_`. Los fragmentos de prueba usan el marcador `SENSITIVE_PROVIDER_DETAIL` para representar el detalle crudo del proveedor que **nunca** debe imprimirse.
 
 ## Estado
 
-**Planned** — lección de la sección 2 secuenciada **después** del paso opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (ya completado y sincronizado con `origin/main` en los commits `d35af37` y `1093d06`). El código aquí descrito es un **plan**: no está implementado, no se ha ejecutado `ruff`/`mypy`/`pytest` sobre él, y no debe marcarse como terminado. Solo se verificaron las firmas de los constructores de excepciones contra el paquete `groq` instalado (v1.7.0).
+**Completed** — lección de la sección 2, secuenciada **después** de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (ya completado y sincronizado) y **antes** de [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md). La refactorización de `hello_ai.py` está implementada y verificada offline: `call_ai` tipada, `main` como límite de presentación/salida, y `tests/test_hello_ai.py` con 6 casos en verde. Evidencia de verificación: `ruff format --check .` limpio (14 archivos), `ruff check .` sin fallos, `mypy src tests --strict` sin problemas en 7 archivos, `pytest tests/test_hello_ai.py` = 6 passed, `pytest` completo = 14 passed. No se realizaron llamadas reales a la API para verificar el manejo de errores.
 
 ## Objetivo de aprendizaje
 
-Convertir la función de dominio de la primera llamada en una unidad tipada y testeable que delega la presentación y la salida al límite de la línea de comandos (`main`), captura las excepciones específicas del SDK de Groq (y un `GroqError` final) sin usar `except Exception` desnudo, y se prueba de forma offline con un cliente falso inyectado.
+Convertir la primera llamada a la API en una unidad tipada y testeable (`call_ai`) que delega la presentación y la salida al límite de la línea de comandos (`main`), captura las excepciones específicas del SDK de Groq (y un `GroqError` final) sin `except Exception` desnudo, y se prueba offline con un cliente falso inyectado.
 
 ## Ruta rápida
 
-1. (Hecho) Completar [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) — `config.py` y `hello_ai.py` funcionando.
-2. (Hecho) La fase opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (`cost.py` + `tests/test_cost.py`) ya está completa y sincronizada (commits `d35af37` y `1093d06` publicados).
-3. (Planned) Refactorizar `hello_ai.py`: añadir `call_ai(client, question, settings) -> ChatCompletion` que devuelve la respuesta completa; `main` captura excepciones y presenta mensajes amigables.
-4. (Planned) Añadir `tests/` que fuerzan fallos de auth/rate-limit/not-found/connection con un cliente falso (`MagicMock`) y un helper seguro de excepciones.
-5. (Planned) Verificar con `ruff format .`, `ruff check .`, `mypy src` (strict) y `pytest`.
+1. (Hecho) [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) — `config.py` y `hello_ai.py` funcionando.
+2. (Hecho) [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (`cost.py` + `tests/test_cost.py`) completo y sincronizado.
+3. (Hecho) Refactor de `hello_ai.py`: `call_ai(client, question, settings) -> ChatCompletion` devuelve la respuesta completa; `main` captura excepciones y presenta mensajes amigables.
+4. (Hecho) `tests/test_hello_ai.py` fuerza fallos de auth/rate-limit/not-found/connection con un cliente falso (`MagicMock`) y helpers seguros de excepciones.
+5. (Hecho) Verificado con `ruff format --check .`, `ruff check .`, `mypy src tests --strict` y `pytest` (offline).
 
-## Resumen del concepto del instructor y mapeo OpenAI → Groq
+## Resumen del concepto y mapeo OpenAI → Groq
 
-La lección original de manejo de errores de la API enseña a capturar los errores del SDK del proveedor y a dar mensajes útiles. Esta nota conserva ese objetivo y lo adapta a Groq; el SDK de Groq replica la jerarquía de excepciones de OpenAI, por lo que el mapeo es directo. No se reproduce el texto ni el material de video del curso.
+La lección original de manejo de errores de la API enseña a capturar los errores del SDK del proveedor y a dar mensajes útiles. El SDK de Groq replica la jerarquía de excepciones de OpenAI, por lo que el mapeo es directo. No se reproduce el texto ni el material de video del curso.
 
-| Concepto del instructor (OpenAI) | Adaptación Groq |
+| Concepto original (OpenAI) | Adaptación Groq (verificada) |
 | --- | --- |
-| Capturar excepciones del SDK `openai` | Capturar excepciones de `groq` (mismas clases; subclases de `GroqError`) |
-| Imprimir / `sys.exit` / `raise` dentro de la función de dominio | La función de dominio solo llama a la API y devuelve/propaga; `main` presenta y decide la salida |
+| Capturar excepciones del SDK `openai` | Capturar `AuthenticationError`, `RateLimitError`, `NotFoundError`, `APIConnectionError` y, al final, `GroqError` (subclases de `GroqError`) |
+| Imprimir / `sys.exit` / `raise` dentro de la función de dominio | `call_ai` solo llama a la API y devuelve/propaga; `main` presenta y decide la salida |
 | `except Exception` desnudo como red de seguridad | Capturar excepciones específicas y, al final, `GroqError` (no `Exception`) |
 | "Probar" fallos sobrescribiendo `.env` o desactivando el Wi-Fi | Probar con un cliente falso inyectado (`MagicMock`) cuyo `.chat.completions.create` lanza la excepción |
-| Reintento manual en bucle ante fallo | El SDK reintenta `RateLimitError`/`APIConnectionError` con backoff hasta `max_retries=2`; no añadir bucle manual |
+| Reintento manual en bucle ante fallo | El SDK reintenta con backoff según `max_retries` (por defecto 2); no se añade bucle manual |
 
-## Conceptos correctos y patrones de riesgo
+## Patrones de riesgo y corrección
 
-| Patrón | Riesgo / por qué | Correcto en Groq |
+| Patrón | Riesgo / por qué | Correcto en Groq (verificado) |
 | --- | --- | --- |
-| `except Exception` desnudo | Oculta bugs de programación (`ValueError`, `TypeError`) y es un parche, no manejo de errores | Capturar `AuthenticationError`, `RateLimitError`, `NotFoundError`, `APIConnectionError` y, al final, `GroqError` |
+| `except Exception` desnudo | Oculta bugs de programación (`ValueError`, `TypeError`) y es un parche, no manejo de errores | `AuthenticationError` → `RateLimitError` → `NotFoundError` → `APIConnectionError` → `GroqError` |
 | Imprimir o `SystemExit` dentro de `call_ai` | Acopla la lógica de dominio a la presentación; imposibilita las pruebas | `call_ai` solo llama a la API y devuelve `ChatCompletion`; `main` imprime y retorna |
 | Sobrescribir `.env` para simular fallo | Corrompe la configuración real y es destructivo | Inyectar un cliente falso que lanza la excepción |
 | Desactivar el Wi-Fi para simular fallo | Acción manual, no automatizable ni aislada | Efecto lateral (`side_effect`) en el cliente falso |
 | Llamada real a la API en las pruebas | Consume cuota y red; no es repetible | Pruebas puras offline con `MagicMock`, sin red ni cuota |
-| Bucle manual de reintentos | Compite con el reintento nativo del SDK y puede duplicar tráfico | Dejar que el SDK reintente (`max_retries=2` por defecto) |
-| `temperature=0` como "idéntico garantizado" | La salida puede variar según el snapshot del modelo; solo es "más determinista" | Documentar que `temperature=0` es más determinista, no idéntico |
+| Bucle manual de reintentos | Compite con el reintento nativo del SDK y puede duplicar tráfico | Dejar que el SDK reintente (`max_retries` por defecto) |
+| Imprimir `f"...{exc}"` del proveedor | Fuga de detalles internos del proveedor (posible secreto) | Mensaje genérico fijo; los detalles crudos no se imprimen |
+| `GroqError()` sin argumentos | `GroqError` **puede** llevar un mensaje; afirmar que no recibe args es falso | `GroqError("detalle")` es válido; el límite lo oculta tras un mensaje fijo |
 
 ## Decisión de arquitectura
 
-Mantener **un solo módulo** `hello_ai.py` (sin duplicar en un `hello_error_managment.py` con falta de ortografía) y añadir una función de dominio tipada:
+Se mantiene **un solo módulo** `hello_ai.py` y se añade una función de dominio tipada:
 
 ```python
 def call_ai(client: Groq, question: str, settings: Settings) -> ChatCompletion: ...
@@ -57,96 +58,26 @@ def call_ai(client: Groq, question: str, settings: Settings) -> ChatCompletion: 
 ## Regla de límite (boundary)
 
 - **La función de dominio no imprime ni llama a `SystemExit`.** Solo invoca la API y devuelve la respuesta (o deja propagar la excepción tipada de Groq).
-- **`main` es el límite de presentación y salida**: captura las excepciones específicas y, al final, `GroqError`, y las mapea a mensajes amigables y a un `return` (comportamiento de salida), sin `raise` ni `SystemExit` en la capa de dominio.
+- **`main` es el límite de presentación y salida**: captura las excepciones específicas y, al final, `GroqError`, y las mapea a mensajes amigables y a un `return`, sin `raise` ni `SystemExit` en la capa de dominio.
 
-## Prohibiciones explícitas
+## Prohibiciones explícitas (verificadas como ausentes)
 
-- No usar `except Exception` desnudo (usar `GroqError` como último recurso tipado).
-- No editar `.env` de forma destructiva para "provocar" fallos en pruebas.
+- No `except Exception` desnudo (se usa `GroqError` como último recurso tipado).
+- No edición destructiva de `.env` para "provocar" fallos en pruebas.
 - No desactivar el Wi-Fi para simular errores de conexión.
-- No realizar llamadas reales a la API dentro de las pruebas (cero cuota, cero red).
-- No añadir un bucle manual de reintentos.
+- No llamadas reales a la API dentro de las pruebas (cero cuota, cero red).
+- No bucle manual de reintentos (reintento nativo del SDK).
+- No `print(f"...{exc}")` del detalle crudo del proveedor.
 
 ## Reintentos nativos del SDK
 
-El SDK de Groq reintenta `RateLimitError` y `APIConnectionError` con retroceso exponencial hasta `max_retries=2` por defecto. Por tanto: no se añade ningún bucle manual de reintentos; `call_ai` simplemente deja que la excepción final se propague y `main` la presenta. El `hello_ai.py` actual ya indica correctamente "do not loop".
+El SDK de Groq reintenta con retroceso exponencial según `max_retries` (por defecto 2) para errores reintentables. Por tanto: no se añade ningún bucle manual de reintentos; `call_ai` simplemente deja que la excepción final se propague y `main` la presenta.
 
-## Plan de pruebas offline seguro (MagicMock + helper de excepciones)
+## Fragmentos verificados (ingleses, en verde con ruff/mypy/pytest)
 
-Las pruebas fuerzan cada fallo mediante un cliente falso cuyo `.chat.completions.create` tiene un `side_effect` que lanza la excepción correspondiente. **Importante (verificado contra `groq` 1.7.0 instalado):** `GroqError` se construye sin argumentos (`GroqError()`), pero sus subclases `APIError`/`APIStatusError` (`AuthenticationError`, `RateLimitError`, `NotFoundError`, `APIConnectionError`) requieren objetos reales `httpx.Request`/`httpx.Response` en el constructor — **no** aceptan un simple mensaje de texto. Por eso el helper seguro construye esos objetos en memoria (sin red) en lugar de inventar constructores inválidos.
+> Estos fragmentos coinciden con el código y las pruebas actuales. No son un plan: están implementados y verificados offline.
 
-```python
-import httpx
-
-from groq import (
-    APIConnectionError,
-    AuthenticationError,
-    NotFoundError,
-    RateLimitError,
-)
-
-
-def _fake_request() -> httpx.Request:
-    return httpx.Request("POST", "https://api.groq.com/v1/chat/completions")
-
-
-def auth_error() -> AuthenticationError:
-    # APIStatusError necesita (message, *, response, body); httpx.Response es en memoria, sin red.
-    return AuthenticationError("invalid API key", response=httpx.Response(401), body=None)
-
-
-def rate_limit_error() -> RateLimitError:
-    return RateLimitError("rate limit reached", response=httpx.Response(429), body=None)
-
-
-def not_found_error() -> NotFoundError:
-    return NotFoundError("model not found", response=httpx.Response(404), body=None)
-
-
-def connection_error() -> APIConnectionError:
-    # APIConnectionError necesita (message=..., request=...); httpx.Request es en memoria, sin red.
-    return APIConnectionError(message="connection failed", request=_fake_request())
-```
-
-Una prueba (AAA, sin red) inyecta un `MagicMock` y verifica que `main`/`call_ai` maneja la excepción:
-
-```python
-from unittest.mock import MagicMock
-
-from python_applied_ai.hello_ai import call_ai
-
-
-def test_call_ai_propagates_auth_error() -> None:
-    fake_client = MagicMock()
-    fake_client.chat.completions.create.side_effect = auth_error()
-
-    settings = MagicMock()
-    settings.llm_model = "openai/gpt-oss-20b"
-    settings.llm_max_tokens = 256
-
-    raised = False
-    try:
-        call_ai(fake_client, "hi", settings)
-    except AuthenticationError:
-        raised = True
-    assert raised is True
-```
-
-Casos cubiertos: autenticación (`AuthenticationError`), límite de tasa (`RateLimitError`), modelo no encontrado (`NotFoundError`), y conexión (`APIConnectionError`). Todas las pruebas son puras y offline; ninguna toca `.env`, la red ni la cuota.
-
-## `temperature` y `top_p`
-
-El código actual usa `temperature=0.7` y `top_p=0.9`, ambos **válidos** para `openai/gpt-oss-20b` (Groq documenta `temperature` 0.0–2.0 y `top_p` 0.0–1.0). Recomendaciones:
-
-- Ajuste **uno a la vez** para aislar efectos (guía oficial de muestreo).
-- `temperature=0` hace la salida "más determinista", **no** "idéntica garantizada"; la reproducibilidad real requiere una semilla (`seed`) y parámetros/modelo idénticos.
-- El ejercicio profundo de `temperature` queda para una lección posterior; aquí solo se conservan los valores actuales.
-
-## Fragmentos planificados (inglés, no verificados por ruff/mypy/pytest)
-
-> Estos fragmentos son el **plan** de la refactorización. No afirman código existente ni pruebas en verde. Las firmas de excepciones fueron verificadas contra `groq` 1.7.0; el resto debe pasar `ruff`/`mypy --strict`/`pytest` al implementarse.
-
-`hello_ai.py` — función de dominio tipada (devuelve la respuesta completa):
+### `hello_ai.py` — `call_ai` (dominio tipado, sin print/SystemExit/try)
 
 ```python
 from groq import Groq
@@ -155,13 +86,13 @@ from groq.types.chat import ChatCompletion
 from python_applied_ai.config import Settings
 
 
-def call_ai(client: Groq, question: str, settings: Settings) -> ChatCompletion:
-    """Call the Groq chat completions API and return the full response.
+def call_ai(
+    client: Groq,
+    question: str,
+    settings: Settings,
+) -> ChatCompletion:
+    """Call Groq and return the complete chat response."""
 
-    The domain function does NOT print or call SystemExit; it returns the
-    full ChatCompletion so report_usage/cost remain reusable, and lets Groq
-    exceptions propagate to the CLI boundary (main).
-    """
     return client.chat.completions.create(
         model=settings.llm_model,
         messages=[{"role": "user", "content": question}],
@@ -171,7 +102,7 @@ def call_ai(client: Groq, question: str, settings: Settings) -> ChatCompletion:
     )
 ```
 
-`hello_ai.py` — `main` como límite de presentación/salida (captura específicas + `GroqError`):
+### `hello_ai.py` — `main` (límite de presentación/salida: específicas → `GroqError`)
 
 ```python
 from groq import (
@@ -184,18 +115,24 @@ from groq import (
 )
 
 from python_applied_ai.config import get_settings
-from python_applied_ai.hello_ai import call_ai, report_usage
 
 
 def main() -> None:
+    """Print a greeting from the LLM."""
     settings = get_settings()
+
     if not settings.groq_api_key or not settings.groq_api_key.get_secret_value():
         print("Missing GROQ API KEY. Add it to .env and retry.")
         return
 
     client = Groq(api_key=settings.groq_api_key.get_secret_value())
+
     try:
-        response = call_ai(client, "Say hello in three languages.", settings)
+        response = call_ai(
+            client,
+            "Say hello in three languages: Spanish, English, and French.",
+            settings,
+        )
     except AuthenticationError:
         print("Authentication failed: GROQ_API_KEY is invalid or revoked.")
         return
@@ -208,61 +145,252 @@ def main() -> None:
     except APIConnectionError:
         print("Connection error: check your network and retry.")
         return
-    except GroqError as exc:
-        print(f"Groq API error: {exc}")
+    except GroqError:
+        print("Unexpected Groq error. Try again later or check the Groq status page.")
         return
 
+    content = response.choices[0].message.content
+    print(content if content is not None else "The model returned an empty response.")
     report_usage(response, settings)
 ```
 
+> Nota: `call_ai` y `report_usage` se definen más arriba en el mismo módulo `hello_ai.py`; se invocan directamente y **no** deben importarse del módulo hacia sí mismo.
+
+- `main` llama a `call_ai` **exactamente una vez**, conserva el prompt, imprime `content` y luego llama a `report_usage(response, settings)` sobre la MISMA `response`.
+- Orden de manejo: `AuthenticationError` → `RateLimitError` → `NotFoundError` → `APIConnectionError` → `GroqError`.
+- El manejador genérico es **exactamente** `except GroqError: print("Unexpected Groq error. Try again later or check the Groq status page."); return`. El detalle crudo del proveedor no se imprime.
+
+## Pruebas offline seguras (MagicMock + helpers de excepciones)
+
+Las pruebas fuerzan cada fallo mediante un cliente falso cuyo `.chat.completions.create` tiene un `side_effect` que lanza la excepción. **Verificado contra el paquete `groq` instalado:** las subclases `APIStatusError` (`AuthenticationError`, `RateLimitError`, `NotFoundError`) requieren `(message, *, response, body)` donde `response` es un `httpx.Response` con un `request` adjunto en memoria; `APIConnectionError` requiere `message=` y `request=` por separado. `GroqError` acepta un mensaje (`GroqError("detalle")`).
+
+### Helpers de excepciones (tests)
+
+```python
+import httpx
+from groq import (
+    APIConnectionError,
+    AuthenticationError,
+    NotFoundError,
+    RateLimitError,
+)
+
+
+def _fake_request() -> httpx.Request:
+    """Create an in-memory HTTP request without network access."""
+    return httpx.Request("POST", "https://api.groq.com/v1/chat/completions")
+
+
+def _connection_error() -> APIConnectionError:
+    # APIConnectionError needs message= + request= (no httpx.Response).
+    return APIConnectionError(message="Connection failed", request=_fake_request())
+
+
+def _auth_error() -> AuthenticationError:
+    # Status errors need (message, *, response, body); attach an in-memory request.
+    return AuthenticationError(
+        "SENSITIVE_PROVIDER_DETAIL",
+        response=httpx.Response(401, request=_fake_request()),
+        body=None,
+    )
+
+
+def _rate_limit_error() -> RateLimitError:
+    return RateLimitError(
+        "SENSITIVE_PROVIDER_DETAIL",
+        response=httpx.Response(429, request=_fake_request()),
+        body=None,
+    )
+
+
+def _not_found_error() -> NotFoundError:
+    return NotFoundError(
+        "SENSITIVE_PROVIDER_DETAIL",
+        response=httpx.Response(404, request=_fake_request()),
+        body=None,
+    )
+```
+
+### Helper de `Settings` (solo tests) y su tradeoff
+
+```python
+from typing import cast
+from pydantic import SecretStr
+from python_applied_ai.config import Settings
+
+
+def _test_settings(
+    *,
+    groq_api_key: SecretStr | None = None,
+    llm_model: str = "openai/gpt-oss-20b",
+    llm_max_tokens: int = 256,
+) -> Settings:
+    """Build trusted test settings without reading environment sources."""
+    return Settings.model_construct(
+        groq_api_key=groq_api_key,
+        llm_model=llm_model,
+        llm_max_tokens=llm_max_tokens,
+    )
+```
+
+- `Settings.model_construct(...)` omite la validación y la carga de entorno, por lo que las pruebas no tocan `.env` ni red.
+- **Tradeoff:** solo es aceptable para fixtures de confianza dentro de `tests/`. Nunca debe moverse a `src/`, donde la validación real de entorno es obligatoria.
+
+## Por qué existen estas pruebas (honestidad de TDD)
+
+- **`test_call_ai_propagates_connection_error` (propagación):** nació en fase RED para exigir que `call_ai` no capture ni silencie errores tipados; confirma que la excepción llega al límite.
+- **`test_main_handles_unexpected_groq_error_safely` (fallback genérico):** también de RED; verifica que el mensaje genérico se muestra y que `SENSITIVE_PROVIDER_DETAIL` **no** aparece en la salida (privacidad).
+- **`test_main_handles_specific_groq_errors_safely` (4 casos parametrizados):** son pruebas de caracterización; se esperan en verde porque el comportamiento de los manejadores específicos ya existía. Documentan el mapeo mensaje por mensaje.
+
+### `tests/test_hello_ai.py` — propagación (pytest.raises)
+
+```python
+from unittest.mock import MagicMock
+import pytest
+from groq import APIConnectionError, Groq
+from python_applied_ai.hello_ai import call_ai
+
+
+def test_call_ai_propagates_connection_error() -> None:
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.side_effect = _connection_error()
+    fake_client = cast(Groq, mock_client)
+
+    settings = _test_settings()
+
+    with pytest.raises(APIConnectionError):
+        call_ai(fake_client, "Hi", settings)
+```
+
+### `tests/test_hello_ai.py` — fallback genérico (privacidad)
+
+```python
+def test_main_handles_unexpected_groq_error_safely(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    settings = _test_settings(groq_api_key=SecretStr("test-key"))
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.side_effect = GroqError("SENSITIVE_PROVIDER_DETAIL")
+
+    with (
+        patch("python_applied_ai.hello_ai.get_settings", return_value=settings),
+        patch("python_applied_ai.hello_ai.Groq", return_value=fake_client),
+    ):
+        main()
+
+    captured = capsys.readouterr()
+    assert "unexpected groq" in captured.out.lower()
+    assert "SENSITIVE_PROVIDER_DETAIL" not in captured.out
+```
+
+### `tests/test_hello_ai.py` — caracterización parametrizada (4 ramas)
+
+```python
+@pytest.mark.parametrize(
+    ("make_error", "expected_fragment"),
+    [
+        (_auth_error, "authentication failed"),
+        (_rate_limit_error, "rate limit"),
+        (_not_found_error, "model not found"),
+        (_connection_error, "connection error"),
+    ],
+)
+def test_main_handles_specific_groq_errors_safely(
+    capsys: pytest.CaptureFixture[str],
+    make_error: Callable[[], GroqError],
+    expected_fragment: str,
+) -> None:
+    settings = _test_settings(groq_api_key=SecretStr("test-key"))
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.side_effect = make_error()
+
+    with (
+        patch("python_applied_ai.hello_ai.get_settings", return_value=settings),
+        patch("python_applied_ai.hello_ai.Groq", return_value=fake_client),
+    ):
+        main()
+
+    captured = capsys.readouterr()
+    assert expected_fragment in captured.out.lower()
+    assert "SENSITIVE_PROVIDER_DETAIL" not in captured.out
+```
+
+Total del archivo: **6 casos** (1 propagación + 1 genérico + 4 parametrizados). Suite completa: **14 tests**.
+
+## `temperature` y `top_p`
+
+El código usa `temperature=0.7` y `top_p=0.9`, ambos válidos para `openai/gpt-oss-20b` (Groq documenta `temperature` 0.0–2.0 y `top_p` 0.0–1.0). Recomendaciones:
+
+- Ajuste **uno a la vez** para aislar efectos (guía oficial de muestreo).
+- `temperature=0` hace la salida "más determinista", **no** "idéntica garantizada"; la reproducibilidad real requiere `seed` y parámetros/modelo idénticos.
+- El experimento profundo de `temperature` queda para [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md).
+
+## Evidencia de verificación (offline, sin llamadas reales)
+
+| Comando | Resultado |
+| --- | --- |
+| `uv run ruff format --check .` | 14 files already formatted (limpio) |
+| `uv run ruff check .` | All checks passed |
+| `uv run mypy src tests --strict` | Success: no issues found in 7 source files |
+| `uv run pytest tests/test_hello_ai.py -q` | 6 passed |
+| `uv run pytest -q` | 14 passed |
+
+No se realizaron llamadas reales a la API para validar el manejo de errores (cero cuota, cero red).
+
 ## Checklist de aceptación
 
-- [ ] `call_ai(client, question, settings) -> ChatCompletion` está tipada y devuelve la respuesta completa.
-- [ ] El cliente se inyecta (las pruebas pasan un falso).
-- [ ] La función de dominio no imprime ni llama a `SystemExit`.
-- [ ] `main` captura `AuthenticationError`, `RateLimitError`, `NotFoundError`, `APIConnectionError` y, al final, `GroqError`.
-- [ ] No hay `except Exception` desnudo.
-- [ ] No se editó `.env` de forma destructiva ni se desactivó el Wi-Fi para probar.
-- [ ] No hay llamadas reales a la API en las pruebas (cero cuota, cero red).
-- [ ] No hay bucle manual de reintentos (se usa el reintento nativo del SDK).
-- [ ] Las pruebas usan `MagicMock` con `side_effect` y el helper seguro de excepciones.
-- [ ] `uv run ruff format .`, `ruff check .`, `uv run mypy src` (strict) y `uv run pytest` en verde (al implementar).
-- [x] El paso opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) está completo y sincronizado (prerrequisito cumplido; commits `d35af37` y `1093d06` publicados).
+- [x] `call_ai(client, question, settings) -> ChatCompletion` está tipada y devuelve la respuesta completa.
+- [x] El cliente se inyecta (las pruebas pasan un falso).
+- [x] La función de dominio no imprime ni llama a `SystemExit`; no tiene `try/except` interno.
+- [x] `main` captura `AuthenticationError`, `RateLimitError`, `NotFoundError`, `APIConnectionError` y, al final, `GroqError`.
+- [x] No hay `except Exception` desnudo.
+- [x] No se editó `.env` de forma destructiva ni se desactivó el Wi-Fi para probar.
+- [x] No hay llamadas reales a la API en las pruebas (cero cuota, cero red).
+- [x] No hay bucle manual de reintentos (reintento nativo del SDK).
+- [x] Las pruebas usan `MagicMock` con `side_effect` y helpers seguros de excepciones (request adjunto para errores de estado; `message=`+`request=` para conexión).
+- [x] El manejador genérico es el mensaje fijo y no imprime detalles crudos del proveedor.
+- [x] `Settings.model_construct` solo en `tests/`, nunca en `src/`.
+- [x] `ruff format --check .`, `ruff check .`, `mypy src tests --strict` y `pytest` en verde (6 + 14).
+- [x] [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) completo y sincronizado (prerrequisito cumplido).
 
 ## Comandos
 
 ```bash
-uv run pytest
-uv run ruff format .
+uv run ruff format --check .
 uv run ruff check .
-uv run mypy src
+uv run mypy src tests --strict
+uv run pytest tests/test_hello_ai.py -q
+uv run pytest -q
 ```
 
 ## Estado actual
 
-- Lección **Planned**; no implementada.
-- La fase opcional de costo de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) ya está completa y sincronizada (commits `d35af37` y `1093d06` publicados); la secuencia es costo → errores → temperatura.
-- Se verificaron solo las firmas de los constructores de excepciones de `groq` 1.7.0; el código de esta lección no se ha ejecutado.
+- Lección **Completed** e implementada; verificada offline (vide supra).
+- La secuencia es costo (02-05) → errores (02-06) → temperatura (02-07).
+- `tests/test_hello_ai.py` añadido (nuevo, sin rastrear en este estado); `hello_ai.py` modificado para extraer `call_ai` y añadir el manejo de `GroqError`.
 
-## Continuidad con la siguiente lección (02-07)
+## Next step
 
-Esta lección (02-06, manejo tipado y testeable de errores) es **Planned** y debe implementarse antes de [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md). La lección 02-07 profundiza en `temperature`, `seed` y reproducibilidad con Groq, y asume que `call_ai(client, question, settings) -> ChatCompletion` (definida aquí en 02-06) ya existe. El experimento controlado de temperatura de 02-07 reutiliza esa misma función de dominio tipada como base; por tanto, 02-06 es prerrequisito directo de 02-07.
+1. Verificación offline final (ya ejecutada: ruff/mypy/pytest en verde).
+2. Opcional: una sola llamada real exitosa a la API para confirmar el flujo feliz (consumo de cuota; **nunca** provocar errores a propósito).
+3. Revisión y commit de `src/python_applied_ai/hello_ai.py`, `tests/test_hello_ai.py` y este documento; luego sincronizar con `origin/main`.
+4. Continuar con [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md).
+
+No se realiza commit ni push en este paso; queda a decisión del usuario.
 
 ## Mensaje de commit sugerido
 
-Para este documento (planeación):
-
-```text
-docs: plan Groq API error handling with typed call_ai and safe offline tests
-```
-
-Para la futura implementación de la refactorización (no en este paso):
+Para la implementación de la refactorización:
 
 ```text
 refactor: add typed call_ai and Groq error handling at CLI boundary
 ```
 
-No se realiza commit ni push en este paso; queda a decisión del usuario.
+Para este documento (estado verificado):
+
+```text
+docs: mark 02-06 Groq error handling as implemented and verified offline
+```
 
 ## Referencias externas oficiales
 
