@@ -409,6 +409,8 @@ uv run python -m python_applied_ai.experiment_temperature  # PLANNED, no existe 
 
 Implemente primero [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md); esta lección 02-07 depende de `call_ai`. El eje `reasoning_effort` (distinto de `temperature`) se cubre en la documentación oficial de razonamiento de Groq, no en este experimento.
 
+La siguiente lección, [02-08-cli-chatbot-conversation-history.md](./02-08-cli-chatbot-conversation-history.md) (Planned), introduce la clase de dominio `ChatBot` con historial de conversación tipado; aún no está implementada.
+
 ## Referencias externas oficiales
 
 - groq-python: https://github.com/groq/groq-python
