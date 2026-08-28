@@ -46,24 +46,43 @@ class ChatBot:
     ) -> None:
         self.client = client
         self.settings = settings
-        self.history: list[ChatCompletionMessageParam] = [
-            ChatCompletionSystemMessageParam(
-                role="system",
-                content=system_prompt,
-            )
-        ]
+        self._system_prompt = system_prompt
+        self.history: list[ChatCompletionMessageParam] = [self._build_system_message()]
+        self._stats = self._build_initial_stats()
+
+    def _build_system_message(self) -> ChatCompletionSystemMessageParam:
+        """Build the opening system message."""
+
+        return ChatCompletionSystemMessageParam(
+            role="system",
+            content=self._system_prompt,
+        )
+
+    def _build_initial_stats(self) -> SessionStats:
+        """Build a zeroed session snapshot with rate-aware cost."""
+
         both_rates_configured = (
-            settings.llm_input_rate_per_million is not None
-            and settings.llm_output_rate_per_million is not None
+            self.settings.llm_input_rate_per_million is not None
+            and self.settings.llm_output_rate_per_million is not None
         )
         initial_cost = Decimal("0") if both_rates_configured else None
-        self._stats = SessionStats(
+
+        return SessionStats(
             turn_count=0,
             prompt_tokens=0,
             completion_tokens=0,
             total_tokens=0,
             theoretical_cost_usd=initial_cost,
         )
+
+    def reset_session(self) -> None:
+        """Restore the chatbot to its initial session state."""
+
+        system_message = self._build_system_message()
+        initial_stats = self._build_initial_stats()
+
+        self.history[:] = [system_message]
+        self._stats = initial_stats
 
     def chat(self, user_message: str) -> ChatTurn:
         """Send one message and commit a successful conversation round."""

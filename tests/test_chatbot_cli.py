@@ -342,3 +342,54 @@ def test_successful_turn_accumulates_exact_theoretical_cost() -> None:
     )
 
     assert chatbot.stats().theoretical_cost_usd == expected
+
+
+def test_reset_session_zeroes_stats_and_preserves_system_with_rates() -> None:
+    """Reset restores zeroed stats and preserves only the system message."""
+
+    usage = CompletionUsage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+    response = MagicMock()
+    response.choices[0].message.content = "Hello"
+    response.usage = usage
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.return_value = cast(
+        ChatCompletion,
+        response,
+    )
+
+    settings = Settings.model_construct(
+        llm_model="openai/gpt-oss-20b",
+        llm_max_tokens=256,
+        llm_input_rate_per_million=Decimal("1.0"),
+        llm_output_rate_per_million=Decimal("2.0"),
+    )
+    chatbot = ChatBot(
+        cast(Groq, fake_client),
+        settings,
+        SYSTEM_PROMPT,
+    )
+    chatbot.chat("Hello")
+
+    chatbot.reset_session()
+
+    stats = chatbot.stats()
+
+    assert stats.turn_count == 0
+    assert stats.prompt_tokens == 0
+    assert stats.completion_tokens == 0
+    assert stats.total_tokens == 0
+    assert stats.theoretical_cost_usd == Decimal("0")
+
+    assert len(chatbot.history) == 1
+
+    system_message = cast(
+        ChatCompletionSystemMessageParam,
+        chatbot.history[0],
+    )
+    assert system_message["role"] == "system"
+    assert system_message["content"] == SYSTEM_PROMPT
