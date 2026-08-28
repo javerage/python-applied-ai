@@ -1,6 +1,7 @@
 """CLI chatbot domain with in-memory conversation history."""
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 from groq import Groq
 from groq.types.chat import (
@@ -22,6 +23,17 @@ class ChatTurn:
     usage: CompletionUsage | None
 
 
+@dataclass(frozen=True, slots=True)
+class SessionStats:
+    """Represent an immutable snapshot of chatbot session totals."""
+
+    turn_count: int
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    theoretical_cost_usd: Decimal | None
+
+
 class ChatBot:
     """Maintain one CLI chatbot session in memory."""
 
@@ -39,6 +51,13 @@ class ChatBot:
                 content=system_prompt,
             )
         ]
+        self._stats = SessionStats(
+            turn_count=0,
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0,
+            theoretical_cost_usd=None,
+        )
 
     def chat(self, user_message: str) -> ChatTurn:
         """Send one message and commit a successful conversation round."""
@@ -66,10 +85,35 @@ class ChatBot:
             content=content,
         )
 
+        usage = response.usage
+
+        if usage is None:
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
+        else:
+            prompt_tokens = usage.prompt_tokens
+            completion_tokens = usage.completion_tokens
+            total_tokens = usage.total_tokens
+
+        next_stats = SessionStats(
+            turn_count=self._stats.turn_count + 1,
+            prompt_tokens=self._stats.prompt_tokens + prompt_tokens,
+            completion_tokens=self._stats.completion_tokens + completion_tokens,
+            total_tokens=self._stats.total_tokens + total_tokens,
+            theoretical_cost_usd=None,
+        )
+
         self.history.append(user_entry)
         self.history.append(assistant_entry)
+        self._stats = next_stats
 
         return ChatTurn(
             text=content,
-            usage=response.usage,
+            usage=usage,
         )
+
+    def stats(self) -> SessionStats:
+        """Return the current session statistics."""
+
+        return self._stats

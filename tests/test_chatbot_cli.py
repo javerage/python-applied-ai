@@ -34,6 +34,7 @@ def _fake_completion(content: str | None) -> ChatCompletion:
 
     response = MagicMock()
     response.choices[0].message.content = content
+    response.usage = None
 
     return cast(ChatCompletion, response)
 
@@ -241,3 +242,56 @@ def test_chat_returns_text_and_provider_usage() -> None:
 
     assert result.text == "Hello"
     assert result.usage == usage
+
+
+def test_fresh_chatbot_reports_zeroed_session_stats() -> None:
+    """A new chatbot reports zero usage and unknown theoretical cost."""
+
+    chatbot = ChatBot(
+        cast(Groq, MagicMock()),
+        _test_settings(),
+        SYSTEM_PROMPT,
+    )
+
+    stats = chatbot.stats()
+
+    assert stats.turn_count == 0
+    assert stats.prompt_tokens == 0
+    assert stats.completion_tokens == 0
+    assert stats.total_tokens == 0
+    assert stats.theoretical_cost_usd is None
+
+
+def test_successful_turn_accumulates_session_stats_without_cost() -> None:
+    """One successful turn drives counts and tokens while cost stays unknown."""
+
+    usage = CompletionUsage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+    response = MagicMock()
+    response.choices[0].message.content = "Hello"
+    response.usage = usage
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.return_value = cast(
+        ChatCompletion,
+        response,
+    )
+
+    chatbot = ChatBot(
+        cast(Groq, fake_client),
+        _test_settings(),
+        SYSTEM_PROMPT,
+    )
+
+    chatbot.chat("Hello")
+
+    stats = chatbot.stats()
+
+    assert stats.turn_count == 1
+    assert stats.prompt_tokens == 10
+    assert stats.completion_tokens == 5
+    assert stats.total_tokens == 15
+    assert stats.theoretical_cost_usd is None
