@@ -12,6 +12,7 @@ from groq.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
+from groq.types.completion_usage import CompletionUsage
 
 from python_applied_ai.chatbot_cli import ChatBot
 from python_applied_ai.config import Settings
@@ -94,7 +95,7 @@ def test_first_chat_round_returns_reply_and_commits_history() -> None:
 
     reply = chatbot.chat("Hello")
 
-    assert reply == "Hello"
+    assert reply.text == "Hello"
     fake_client.chat.completions.create.assert_called_once()
 
     assert len(chatbot.history) == 3
@@ -133,7 +134,7 @@ def test_second_chat_round_sends_prior_context() -> None:
     chatbot.chat("First question")
     reply = chatbot.chat("Second question")
 
-    assert reply == "Second reply"
+    assert reply.text == "Second reply"
 
     second_call = fake_client.chat.completions.create.call_args_list[1]
     messages = second_call.kwargs["messages"]
@@ -200,7 +201,7 @@ def test_empty_response_content_returns_and_stores_empty_string() -> None:
 
     reply = chatbot.chat("Hello")
 
-    assert reply == ""
+    assert reply.text == ""
     assert len(chatbot.history) == 3
 
     assistant_message = cast(
@@ -210,3 +211,33 @@ def test_empty_response_content_returns_and_stores_empty_string() -> None:
 
     assert assistant_message["role"] == "assistant"
     assert assistant_message["content"] == ""
+
+
+def test_chat_returns_text_and_provider_usage() -> None:
+    """A successful response exposes its text and provider usage."""
+
+    usage = CompletionUsage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+    response = MagicMock()
+    response.choices[0].message.content = "Hello"
+    response.usage = usage
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.return_value = cast(
+        ChatCompletion,
+        response,
+    )
+
+    chatbot = ChatBot(
+        cast(Groq, fake_client),
+        _test_settings(),
+        SYSTEM_PROMPT,
+    )
+
+    result = chatbot.chat("Hello")
+
+    assert result.text == "Hello"
+    assert result.usage == usage

@@ -1,5 +1,7 @@
 """CLI chatbot domain with in-memory conversation history."""
 
+from dataclasses import dataclass
+
 from groq import Groq
 from groq.types.chat import (
     ChatCompletionAssistantMessageParam,
@@ -7,8 +9,17 @@ from groq.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
+from groq.types.completion_usage import CompletionUsage
 
 from python_applied_ai.config import Settings
+
+
+@dataclass(frozen=True, slots=True)
+class ChatTurn:
+    """Represent one successful chatbot response."""
+
+    text: str
+    usage: CompletionUsage | None
 
 
 class ChatBot:
@@ -29,7 +40,7 @@ class ChatBot:
             )
         ]
 
-    def chat(self, user_message: str) -> str:
+    def chat(self, user_message: str) -> ChatTurn:
         """Send one message and commit a successful conversation round."""
 
         user_entry = ChatCompletionUserMessageParam(
@@ -58,4 +69,7 @@ class ChatBot:
         self.history.append(user_entry)
         self.history.append(assistant_entry)
 
-        return content
+        return ChatTurn(
+            text=content,
+            usage=response.usage,
+        )
