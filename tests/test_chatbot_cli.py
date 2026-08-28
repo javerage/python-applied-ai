@@ -1,5 +1,6 @@
 """Offline tests for the CLI chatbot conversation history."""
 
+from decimal import Decimal
 from typing import cast
 from unittest.mock import MagicMock
 
@@ -16,6 +17,7 @@ from groq.types.completion_usage import CompletionUsage
 
 from python_applied_ai.chatbot_cli import ChatBot
 from python_applied_ai.config import Settings
+from python_applied_ai.cost import estimate_cost_usd
 
 SYSTEM_PROMPT = "You are a helpful Python and AI assistant."
 
@@ -295,3 +297,48 @@ def test_successful_turn_accumulates_session_stats_without_cost() -> None:
     assert stats.completion_tokens == 5
     assert stats.total_tokens == 15
     assert stats.theoretical_cost_usd is None
+
+
+def test_successful_turn_accumulates_exact_theoretical_cost() -> None:
+    """One successful turn with configured rates yields an exact Decimal cost."""
+
+    usage = CompletionUsage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+    response = MagicMock()
+    response.choices[0].message.content = "Hello"
+    response.usage = usage
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.return_value = cast(
+        ChatCompletion,
+        response,
+    )
+
+    input_rate = Decimal("1.0")
+    output_rate = Decimal("2.0")
+    settings = Settings.model_construct(
+        llm_model="openai/gpt-oss-20b",
+        llm_max_tokens=256,
+        llm_input_rate_per_million=input_rate,
+        llm_output_rate_per_million=output_rate,
+    )
+
+    chatbot = ChatBot(
+        cast(Groq, fake_client),
+        settings,
+        SYSTEM_PROMPT,
+    )
+
+    chatbot.chat("Hello")
+
+    expected = estimate_cost_usd(
+        prompt_tokens=usage.prompt_tokens,
+        completion_tokens=usage.completion_tokens,
+        input_rate_per_million=input_rate,
+        output_rate_per_million=output_rate,
+    )
+
+    assert chatbot.stats().theoretical_cost_usd == expected
