@@ -163,7 +163,7 @@ def test_second_chat_round_sends_prior_context() -> None:
 
 
 def test_api_failure_leaves_history_unchanged() -> None:
-    """A failed request must not leave an orphan user message in history."""
+    """A failed request must not mutate history or session stats."""
 
     settings = _test_settings()
     fake_client = MagicMock()
@@ -174,6 +174,8 @@ def test_api_failure_leaves_history_unchanged() -> None:
         settings,
         SYSTEM_PROMPT,
     )
+
+    stats_before = chatbot.stats()
 
     with pytest.raises(APIConnectionError):
         chatbot.chat("This request fails")
@@ -187,10 +189,11 @@ def test_api_failure_leaves_history_unchanged() -> None:
 
     assert system_message["role"] == "system"
     assert system_message["content"] == SYSTEM_PROMPT
+    assert chatbot.stats() == stats_before
 
 
 def test_empty_response_content_returns_and_stores_empty_string() -> None:
-    """An empty provider response is stored consistently as an empty string."""
+    """An empty provider response is one successful turn with zero known usage."""
 
     settings = _test_settings()
     fake_client = MagicMock()
@@ -214,6 +217,14 @@ def test_empty_response_content_returns_and_stores_empty_string() -> None:
 
     assert assistant_message["role"] == "assistant"
     assert assistant_message["content"] == ""
+
+    stats = chatbot.stats()
+
+    assert stats.turn_count == 1
+    assert stats.prompt_tokens == 0
+    assert stats.completion_tokens == 0
+    assert stats.total_tokens == 0
+    assert stats.theoretical_cost_usd is None
 
 
 def test_chat_returns_text_and_provider_usage() -> None:
@@ -393,3 +404,148 @@ def test_reset_session_zeroes_stats_and_preserves_system_with_rates() -> None:
     )
     assert system_message["role"] == "system"
     assert system_message["content"] == SYSTEM_PROMPT
+
+
+def test_reset_session_zeroes_stats_and_preserves_system_without_rates() -> None:
+    """Reset without rates restores zeroed stats with unknown cost."""
+
+    settings = _test_settings()
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.return_value = _fake_completion("Hello")
+
+    chatbot = ChatBot(
+        cast(Groq, fake_client),
+        settings,
+        SYSTEM_PROMPT,
+    )
+    chatbot.chat("Hello")
+
+    assert chatbot.stats().turn_count == 1
+    assert len(chatbot.history) == 3
+
+    chatbot.reset_session()
+
+    stats = chatbot.stats()
+
+    assert stats.turn_count == 0
+    assert stats.prompt_tokens == 0
+    assert stats.completion_tokens == 0
+    assert stats.total_tokens == 0
+    assert stats.theoretical_cost_usd is None
+
+    assert len(chatbot.history) == 1
+
+    system_message = cast(
+        ChatCompletionSystemMessageParam,
+        chatbot.history[0],
+    )
+    assert system_message["role"] == "system"
+    assert system_message["content"] == SYSTEM_PROMPT
+
+
+def test_two_successful_turns_accumulate_exact_token_totals_and_cost() -> None:
+    """Two successful turns sum token totals and Decimal cost."""
+
+    usage_first = CompletionUsage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+    usage_second = CompletionUsage(
+        prompt_tokens=20,
+        completion_tokens=8,
+        total_tokens=28,
+    )
+
+    first_response = MagicMock()
+    first_response.choices[0].message.content = "First reply"
+    first_response.usage = usage_first
+
+    second_response = MagicMock()
+    second_response.choices[0].message.content = "Second reply"
+    second_response.usage = usage_second
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.side_effect = [
+        cast(ChatCompletion, first_response),
+        cast(ChatCompletion, second_response),
+    ]
+
+    input_rate = Decimal("1.0")
+    output_rate = Decimal("2.0")
+    settings = Settings.model_construct(
+        llm_model="openai/gpt-oss-20b",
+        llm_max_tokens=256,
+        llm_input_rate_per_million=input_rate,
+        llm_output_rate_per_million=output_rate,
+    )
+    chatbot = ChatBot(
+        cast(Groq, fake_client),
+        settings,
+        SYSTEM_PROMPT,
+    )
+
+    chatbot.chat("First question")
+    chatbot.chat("Second question")
+
+    expected_cost = estimate_cost_usd(
+        prompt_tokens=usage_first.prompt_tokens,
+        completion_tokens=usage_first.completion_tokens,
+        input_rate_per_million=input_rate,
+        output_rate_per_million=output_rate,
+    ) + estimate_cost_usd(
+        prompt_tokens=usage_second.prompt_tokens,
+        completion_tokens=usage_second.completion_tokens,
+        input_rate_per_million=input_rate,
+        output_rate_per_million=output_rate,
+    )
+
+    stats = chatbot.stats()
+
+    assert stats.turn_count == 2
+    assert stats.prompt_tokens == 30
+    assert stats.completion_tokens == 13
+    assert stats.total_tokens == 43
+    assert stats.theoretical_cost_usd == expected_cost
+
+
+def test_failed_second_turn_preserves_accumulated_session_state() -> None:
+    """A failed second turn preserves the first successful turn state."""
+
+    usage_first = CompletionUsage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+    first_response = MagicMock()
+    first_response.choices[0].message.content = "First reply"
+    first_response.usage = usage_first
+
+    fake_client = MagicMock()
+    fake_client.chat.completions.create.side_effect = [
+        cast(ChatCompletion, first_response),
+        _connection_error(),
+    ]
+
+    settings = Settings.model_construct(
+        llm_model="openai/gpt-oss-20b",
+        llm_max_tokens=256,
+        llm_input_rate_per_million=Decimal("1.0"),
+        llm_output_rate_per_million=Decimal("2.0"),
+    )
+    chatbot = ChatBot(
+        cast(Groq, fake_client),
+        settings,
+        SYSTEM_PROMPT,
+    )
+
+    chatbot.chat("First question")
+
+    stats_after_first = chatbot.stats()
+    history_after_first = list(chatbot.history)
+
+    with pytest.raises(APIConnectionError):
+        chatbot.chat("This second request fails")
+
+    assert chatbot.stats() == stats_after_first
+    assert chatbot.history == history_after_first
