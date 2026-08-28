@@ -15,15 +15,15 @@ La implementación está en `src/python_applied_ai/chatbot_cli.py` y sus pruebas
 
 ## Roadmap del proyecto (tres videos)
 
-El proyecto de chatbot en CLI abarca **tres videos** del curso. Esta guía (02-08) corresponde al **video 1** (clase de dominio `ChatBot` + historial + `chat`). Los videos 2 y 3 aún no tienen transcripción; por tanto, **02-09** y **02-10** se reservan con títulos de trabajo y su contenido exacto queda pendiente hasta recibir las transcripciones.
+El proyecto de chatbot en CLI abarca **tres videos** del curso. Esta guía (02-08) corresponde al **video 1** (clase de dominio `ChatBot` + historial + `chat`). Las transcripciones de los videos 2 y 3 confirmaron las siguientes etapas; sus guías siguen planificadas hasta implementar el código.
 
 | Guía | Video | Título de trabajo (provisional) | Contenido exacto |
 | --- | --- | --- | --- |
 | 02-08 (esta) | Video 1 | Clase de dominio con historial | Implementado y verificado offline |
-| 02-09 | Video 2 | Costo y estadísticas de sesión | Pendiente de transcripción |
-| 02-10 | Video 3 | Bucle de CLI e integración final | Pendiente de transcripción |
+| 02-09 | Video 2 | Uso, costo teórico y estadísticas de sesión | Planificado |
+| 02-10 | Video 3 | Bucle CLI e integración final | Planificado |
 
-> **Advertencia de provisionalidad:** la historia de commits públicos sugiere (inferencia, **no confirmado**) que el video 2 trata costo/estadísticas y el video 3 la integración de bucle en CLI. No presente esto como hecho hasta tener las transcripciones. Mientras tanto, no afirme que el bucle de CLI y el costo son ambos, definitivamente, 02-09.
+> **Límite de alcance:** 02-09 agregará estadísticas de sesión y costo teórico; 02-10 integrará el bucle de terminal. Ninguna de esas capacidades forma parte del código completado en esta guía.
 
 ## Ruta rápida (primero el resultado)
 
