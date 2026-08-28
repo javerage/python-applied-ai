@@ -4,7 +4,7 @@
 
 ## Estado
 
-**Planned** — tercera y última parte del proyecto CLI. Requiere [02-08-cli-chatbot-conversation-history.md](./02-08-cli-chatbot-conversation-history.md) y el contrato de resultados/estadísticas planificado en [02-09-cli-chatbot-session-usage-and-cost.md](./02-09-cli-chatbot-session-usage-and-cost.md).
+**Planned** — tercera y última parte del proyecto CLI. Requiere [02-08-cli-chatbot-conversation-history.md](./02-08-cli-chatbot-conversation-history.md) y el contrato de resultados/estadísticas **ya implementado** en [02-09-cli-chatbot-session-usage-and-cost.md](./02-09-cli-chatbot-session-usage-and-cost.md).
 
 ## Resultado esperado
 
@@ -31,7 +31,7 @@ Una función de ejecución de terminal testable recibe entradas normalizadas, ll
 El dominio conserva historial y estadísticas. La terminal solo coordina entradas/salidas. Para probarlo, el bucle no debe crear un cliente real ni leer configuración directamente.
 
 ```python
-# PLANNED: src/python_applied_ai/chatbot_cli.py
+# PLANNED (02-10): run_cli/format_stats; stats() y reset_session() ya existen (02-09).
 from collections.abc import Callable
 
 from groq import (
@@ -95,7 +95,7 @@ def run_cli(
         output_fn(format_stats(bot.stats()))
 ```
 
-Los nombres son planificados: `stats()`, `reset_session()` y `format_stats()` deben provenir del contrato de 02-09. El orden específico→genérico evita que `GroqError` capture antes a sus subclases. Ningún mensaje imprime el detalle crudo del proveedor.
+Los nombres `stats()` y `reset_session()` **ya están implementados en 02-09**; `format_stats()` sigue planificada en esta guía (02-10). El bucle invoca `bot.stats()` y `bot.reset_session()` según el contrato ya existente. El orden específico→genérico evita que `GroqError` capture antes a sus subclases. Ningún mensaje imprime el detalle crudo del proveedor.
 
 ## Comandos de la conversación
 
@@ -152,7 +152,7 @@ uv run pytest -q
 
 ## Siguiente paso
 
-Implementar primero 02-09 mediante TDD. Después, esta guía integrará el chatbot terminado y cerrará la sección 2.
+02-09 ya está implementado y verificado offline. Esta guía (02-10) integrará el chatbot terminado (con `ChatTurn`, `SessionStats`, `stats()`, `reset_session()`) y cerrará la sección 2.
 
 ## Referencias oficiales
 
