@@ -15,6 +15,7 @@ from groq.types.chat import (
 )
 from groq.types.completion_usage import CompletionUsage
 
+from python_applied_ai import chatbot_cli
 from python_applied_ai.chatbot_cli import ChatBot
 from python_applied_ai.config import Settings
 from python_applied_ai.cost import estimate_cost_usd
@@ -549,3 +550,49 @@ def test_failed_second_turn_preserves_accumulated_session_state() -> None:
 
     assert chatbot.stats() == stats_after_first
     assert chatbot.history == history_after_first
+
+
+def test_format_stats_renders_session_summary() -> None:
+    """Format session statistics as a deterministic CLI summary."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=2,
+        prompt_tokens=30,
+        completion_tokens=13,
+        total_tokens=43,
+        theoretical_cost_usd=Decimal("0.00003"),
+    )
+
+    rendered = chatbot_cli.format_stats(stats)
+
+    assert rendered == (
+        "Session statistics:\n"
+        "Turns: 2\n"
+        "Prompt tokens: 30\n"
+        "Completion tokens: 13\n"
+        "Total tokens: 43\n"
+        "Theoretical cost (USD, not billed): 0.00003"
+    )
+
+
+def test_format_stats_marks_unavailable_cost_when_none() -> None:
+    """Render unavailable when theoretical cost was not computed."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+
+    rendered = chatbot_cli.format_stats(stats)
+
+    assert rendered == (
+        "Session statistics:\n"
+        "Turns: 0\n"
+        "Prompt tokens: 0\n"
+        "Completion tokens: 0\n"
+        "Total tokens: 0\n"
+        "Theoretical cost (USD, not billed): unavailable"
+    )

@@ -35,6 +35,22 @@ class SessionStats:
     theoretical_cost_usd: Decimal | None
 
 
+def format_stats(stats: SessionStats) -> str:
+    """Render an immutable session snapshot as a deterministic CLI summary."""
+
+    cost = stats.theoretical_cost_usd
+    cost_text = "unavailable" if cost is None else str(cost)
+
+    return (
+        "Session statistics:\n"
+        f"Turns: {stats.turn_count}\n"
+        f"Prompt tokens: {stats.prompt_tokens}\n"
+        f"Completion tokens: {stats.completion_tokens}\n"
+        f"Total tokens: {stats.total_tokens}\n"
+        f"Theoretical cost (USD, not billed): {cost_text}"
+    )
+
+
 class ChatBot:
     """Maintain one CLI chatbot session in memory."""
 
