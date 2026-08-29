@@ -193,8 +193,18 @@ def run_cli(
 
     try:
         while True:
-            user_input = input_fn("You: ")
-            if user_input.strip().lower() in EXIT_COMMANDS:
+            raw_input = input_fn("You: ")
+            command = raw_input.strip()
+            normalized = command.lower()
+
+            if not command:
+                continue
+
+            if normalized in EXIT_COMMANDS:
                 break
+
+            if normalized == "/stats":
+                output_fn(format_stats(bot.stats()))
+                continue
     finally:
         output_fn(format_stats(bot.stats()))

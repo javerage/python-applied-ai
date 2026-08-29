@@ -630,3 +630,66 @@ def test_run_cli_exits_after_single_exit_command(user_command: str) -> None:
     fake_bot.stats.assert_called_once_with()
 
     assert outputs == [chatbot_cli.format_stats(stats)]
+
+
+def test_run_cli_ignores_blank_input_before_exit() -> None:
+    """Ignore whitespace-only input and continue until exit."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=["   ", "exit"])
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    assert input_mock.call_count == 2
+    fake_bot.chat.assert_not_called()
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [chatbot_cli.format_stats(stats)]
+
+
+def test_run_cli_prints_stats_on_stats_command() -> None:
+    """Print session stats on /stats without calling chat or reset."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=["/stats", "exit"])
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    assert input_mock.call_count == 2
+    fake_bot.chat.assert_not_called()
+    fake_bot.reset_session.assert_not_called()
+    assert fake_bot.stats.call_count == 2
+
+    assert outputs == [
+        chatbot_cli.format_stats(stats),
+        chatbot_cli.format_stats(stats),
+    ]
