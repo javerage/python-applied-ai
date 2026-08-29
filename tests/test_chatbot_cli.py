@@ -596,3 +596,37 @@ def test_format_stats_marks_unavailable_cost_when_none() -> None:
         "Total tokens: 0\n"
         "Theoretical cost (USD, not billed): unavailable"
     )
+
+
+@pytest.mark.parametrize(
+    "user_command",
+    ["exit", "QUIT", "  salir  ", "Bye"],
+)
+def test_run_cli_exits_after_single_exit_command(user_command: str) -> None:
+    """Exit after one command without calling the model."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(return_value=user_command)
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    input_mock.assert_called_once_with("You: ")
+    fake_bot.chat.assert_not_called()
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [chatbot_cli.format_stats(stats)]

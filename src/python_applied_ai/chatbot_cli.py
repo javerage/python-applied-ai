@@ -1,5 +1,6 @@
 """CLI chatbot domain with in-memory conversation history."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -14,6 +15,8 @@ from groq.types.completion_usage import CompletionUsage
 
 from python_applied_ai.config import Settings
 from python_applied_ai.cost import estimate_cost_usd
+
+EXIT_COMMANDS: frozenset[str] = frozenset({"quit", "exit", "salir", "bye"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,3 +181,20 @@ class ChatBot:
         """Return the current session statistics."""
 
         return self._stats
+
+
+def run_cli(
+    bot: ChatBot,
+    *,
+    input_fn: Callable[[str], str] = input,
+    output_fn: Callable[[str], None] = print,
+) -> None:
+    """Run the minimal CLI loop around public ChatBot APIs."""
+
+    try:
+        while True:
+            user_input = input_fn("You: ")
+            if user_input.strip().lower() in EXIT_COMMANDS:
+                break
+    finally:
+        output_fn(format_stats(bot.stats()))
