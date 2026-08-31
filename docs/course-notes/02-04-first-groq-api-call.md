@@ -4,11 +4,11 @@
 
 ## Estado
 
-**Completed** — `config.py` y `hello_ai.py` están implementados en el repositorio y ambas llamadas en vivo a la API de Groq pasaron (saludo único y tarea de tres lenguas). La cobertura de pruebas de comportamiento sigue siendo un seguimiento de portafolio, no un bloqueador del curso.
+**Completed — etapa 3 de 9.** Parte de la API key segura de 02-03 y añade `Settings`, `hello_ai.py` y la primera llamada. El checkpoint mantiene **1 test automatizado** de infraestructura y añade un smoke test live manual; uso, costo, errores tipados y temperatura llegan en etapas posteriores.
 
 ## Objetivo de aprendizaje
 
-Realizar la primera llamada a la API de Groq cargando una configuración tipada desde el entorno y enviando un único mensaje de usuario, imprimiendo la respuesta del modelo con manejo de errores.
+Realizar la primera llamada a Groq cargando configuración tipada, enviando un único mensaje y mostrando la respuesta. El manejo detallado de errores se incorpora deliberadamente en 02-06.
 
 ## Ruta rápida
 
@@ -79,62 +79,34 @@ Notas clave:
 ## Implementación: `src/python_applied_ai/hello_ai.py`
 
 ```python
-"""Make the first API call through the Groq LLM API."""
+from groq import Groq
+from groq.types.chat import ChatCompletion
 
-from groq import (
-    APIConnectionError,
-    AuthenticationError,
-    Groq,
-    NotFoundError,
-    RateLimitError,
-)
+from python_applied_ai.config import Settings, get_settings
 
-from python_applied_ai.config import get_settings
+
+def call_ai(client: Groq, question: str, settings: Settings) -> ChatCompletion:
+    return client.chat.completions.create(
+        model=settings.llm_model,
+        messages=[{"role": "user", "content": question}],
+        max_tokens=settings.llm_max_tokens,
+        temperature=0.7,
+        top_p=0.9,
+    )
 
 
 def main() -> None:
-    """Print a greeting from the LLM."""
     settings = get_settings()
-
-    if not settings.groq_api_key or not settings.groq_api_key.get_secret_value():
+    if not settings.groq_api_key:
         print("Missing GROQ API KEY. Add it to .env and retry.")
         return
 
     client = Groq(api_key=settings.groq_api_key.get_secret_value())
-
-    try:
-        response = client.chat.completions.create(
-            model=settings.llm_model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": "Say hello in three languages: Spanish, English, and French.",
-                }
-            ],
-            max_tokens=settings.llm_max_tokens,
-            temperature=0.7,
-            top_p=0.9,
-        )
-    except AuthenticationError:
-        print("Authentication failed: GROQ_API_KEY is invalid or revoked.")
-        return
-    except RateLimitError:
-        print("Rate limit reached. Wait and retry later; do not loop.")
-        return
-    except NotFoundError:
-        print(f"Model not found: {settings.llm_model}. Check LLM_MODEL in .env.")
-        return
-    except APIConnectionError:
-        print("Connection error: check your network and retry.")
-        return
-
-    content = response.choices[0].message.content
-    print(content if content is not None else "The model returned an empty response.")
-
-
-if __name__ == "__main__":
-    main()
+    response = call_ai(client, "Say hello in three languages.", settings)
+    print(response.choices[0].message.content or "")
 ```
+
+Este es el **estado didáctico de 02-04**, no el archivo final. 02-05 añade uso/costo, 02-06 introduce errores tipados y 02-07 reemplaza la temperatura literal por configuración validada.
 
 ## Ejecución
 
@@ -162,12 +134,14 @@ uv run pytest
 ```
 
 - `ruff` no reportó errores de formato ni de lint.
-- `mypy` (modo strict) no reportó errores de tipos (3 archivos fuente).
-- `pytest` pasó la prueba de paquete existente (`test_package_can_be_imported`) sin regresiones. **Cobertura limitada:** `pytest` solo verifica que el paquete se importe; el comportamiento de configuración ni la llamada a la API están cubiertos por pruebas automatizadas. Esa es una brecha de portafolio, no un bloqueador de la lección.
-- Llamada en vivo: el módulo anterior realizó la llamada real a Groq y devolvió las tres salutaciones.
+- `mypy` (modo strict) no reportó errores de tipos (9 archivos fuente).
+- `pytest` conserva verde el test de infraestructura de esta etapa.
+- Llamada en vivo: el módulo `hello_ai.py` realizó la llamada real a Groq y devolvió las tres salutaciones.
 
-## Decisiones, trade-offs y errores comunes
+## Decisión, trade-offs y errores comunes
 
+- **Contrato `Settings` → `Groq` → `call_ai`/`response`**: esta etapa configura key, modelo y límite de tokens. `call_ai` encapsula una única llamada; las responsabilidades de reporte y errores se añaden en 02-05/02-06.
+- **Live vs offline**: `hello_ai.py` ejecuta llamadas reales a Groq cuando se invoca con `uv run python -m python_applied_ai.hello_ai`. Las pruebas de `test_hello_ai.py` son 100 % offline (MagicMock, sin red ni cuota). La verificación offline confirma el comportamiento del manejo de errores; la verificación live confirma el flujo feliz con la API real. Ambos son complementarios, no sustitutos.
 - **`extra="ignore"` obligatorio**: sin él, `SettingsConfigDict(env_file=".env")` lanza `ValidationError` (`extra_forbidden`) por las variables no declaradas del `.env` compartido.
 - **`SecretStr`**: endurece el manejo del secreto; nunca se imprime ni se registra su longitud.
 - **`pydantic-settings` no exporta a `os.environ`**: pase `api_key` explícitamente a `Groq(api_key=...)`.
@@ -176,7 +150,7 @@ uv run pytest
 - **`max_tokens`**: válido para `openai/gpt-oss-20b`; los modelos de razonamiento pueden documentar además `max_completion_tokens`. Los tokens de razonamiento cuentan hacia el límite; aumente el valor si la respuesta se trunca.
 - **`get_settings()`**: `hello_ai.py` usa la función de fábrica en lugar de instanciar `Settings()` directamente.
 
-## Estado actual y siguiente paso
+## Resultado de etapa y siguiente paso
 
 Con la cuenta/key lista (`02-03-groq-account-api-key.md`) y el andamiaje completo (`02-02-project-scaffold.md`), `config.py` y `hello_ai.py` existen y ambas llamadas en vivo pasaron (saludo único y tarea de tres lenguas). El siguiente paso es [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (uso de tokens y estimación de costo), ahora desbloqueado por esta lección.
 

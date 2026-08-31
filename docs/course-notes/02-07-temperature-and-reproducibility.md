@@ -4,7 +4,7 @@
 
 ## Estado
 
-**Planned** — lección de la sección 2. Prerrequisitos: [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (costo) ya completado y sincronizado, y [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) (manejo de errores) **debe implementarse primero**. El código aquí descrito es un **plan**: no está implementado, no se ha ejecutado `ruff`/`mypy`/`pytest` sobre él, y no debe marcarse como terminado. Los hechos de Groq citados se verificaron contra la documentación oficial (Context7) y el SDK instalado.
+**Completed — etapa 6 de 9.** Parte de los 14 tests de 02-06 y añade configuración productiva `LLM_TEMPERATURE`, validación provider-neutral, reenvío de `temperature`/`seed` y un harness inmutable. Esta etapa aporta 32 casos offline y deja el checkpoint acumulado en **46 tests**. El experimento live es opcional y no se ejecutó.
 
 ## Objetivo de aprendizaje
 
@@ -13,10 +13,41 @@ Comprender qué controla realmente `temperature` en Groq, por qué `temperature=
 ## Ruta rápida
 
 1. (Hecho) [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) completo — medición de tokens y costo teórico.
-2. (Planned) Implementar [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) (define `call_ai`) antes de esta lección.
-3. (Planned) Añadir `validate_temperature` puro en `src/python_applied_ai/sampling.py`.
-4. (Planned) Extender `call_ai` con `temperature: float = 0.7` y un harness de experimento separado.
-5. (Planned) Verificar con `ruff format --check .`, `ruff check .`, `mypy src` y `pytest` (pruebas 100% offline).
+2. (Hecho) [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) completado — define `call_ai`.
+3. (Hecho) `src/python_applied_ai/sampling.py` valida valores finitos entre `0.0` y `2.0`, ambos inclusive.
+4. (Hecho) `call_ai` reenvía `temperature` y `seed`; `experiment_temperature.py` pre-valida toda la secuencia y produce filas inmutables.
+5. (Hecho) Ruff, mypy y los **46 tests acumulados** pasan sin red ni consumo de cuota.
+
+## Integración productiva de `LLM_TEMPERATURE`
+
+Esta etapa elimina la temperatura como decisión dispersa. La configuración final sigue una sola ruta:
+
+```text
+.env → Settings.llm_temperature → validate_temperature → Groq
+```
+
+Añada a `.env.example` y al `.env` privado:
+
+```dotenv
+LLM_TEMPERATURE=0.7
+```
+
+En `Settings`, el valor se valida como finito y dentro del rango inclusivo `0..2`:
+
+```python
+from typing import Annotated
+
+from pydantic import Field
+
+llm_temperature: Annotated[
+    float,
+    Field(ge=0.0, le=2.0, allow_inf_nan=False),
+] = 0.7
+```
+
+`hello_ai.main` entrega `settings.llm_temperature` a `call_ai`; la validación pura se repite en el límite del SDK. En 02-08, el nuevo `ChatBot` consumirá el mismo campo desde su primer diseño, evitando volver a introducir `0.7` como literal.
+
+El `seed` permanece fuera de `Settings`: solo sirve al laboratorio para comparar configuraciones best-effort y no promete determinismo en conversaciones con historial cambiante.
 
 ## Concepto del instructor vs. mapeo riguroso a Groq
 
@@ -35,7 +66,7 @@ La lección original sobre temperatura enseña la intuición de "más bajo = má
 | Etiqueta (heurística) | Rango sugerido | Nota |
 | --- | --- | --- |
 | Muy determinista | 0.0–0.3 | Combínela con `seed` para mejorar reproducibilidad best-effort. |
-| Equilibrada (valor actual de `call_ai` en 02-06) | ~0.7 | Valor por defecto usado en el código planeado. |
+| Equilibrada (valor actual de `call_ai`) | ~0.7 | Valor por defecto implementado. |
 | Creativa | ~1.0–1.5 | Mayor diversidad; sin garantía de calidad. |
 | Caótica (solo si la cuota lo permite) | ~2.0 | Máxima aleatoriedad; útil para explorar límites, no para producción. |
 
@@ -43,7 +74,7 @@ La lección original sobre temperatura enseña la intuición de "más bajo = má
 
 ## Intuición de muestreo y lo que la temperatura NO controla
 
-`temperature` escala la entropía de la distribución de probabilidad antes de muestrear el siguiente token: valores bajos aplatan la distribución (más probable → más repetible), valores altos la aplanan (más diverso). Pero es un parámetro de **muestreo**, no de semántica.
+`temperature` reescala la distribución de probabilidad antes de muestrear el siguiente token: valores bajos la vuelven más concentrada en los tokens probables; valores altos la aplanan y aumentan la diversidad. Es un parámetro de **muestreo**, no de semántica.
 
 | Lo que la temperatura NO controla | Por qué |
 | --- | --- |
@@ -54,9 +85,9 @@ La lección original sobre temperatura enseña la intuición de "más bajo = má
 
 ## Rango 0–2, bandas prácticas y top_p
 
-- **Rango documentado:** `temperature` acepta `float` en **0–2** en `client.chat.completions.create` de Groq. Valores fuera de ese rango deben ser rechazados por la validación (ver plan de arquitectura).
+- **Rango documentado:** `temperature` acepta `float` en **0–2** en `client.chat.completions.create` de Groq. La validación implementada también rechaza `NaN` e infinitos.
 - **Bandas prácticas:** véase la tabla heurística arriba. Úselas como punto de partida, no como regla.
-- **`top_p` (núcleo):** parámetro de muestreo distinto, rango **0–1**. La `call_ai` planeada en 02-06 usa `top_p=0.9`. **No** cambie `temperature` y `top_p` simultáneamente; aisle efectos ajustando uno a la vez.
+- **`top_p` (núcleo):** parámetro de muestreo distinto, rango **0–1**. `call_ai` usa `top_p=0.9`. **No** cambie `temperature` y `top_p` simultáneamente; aisle efectos ajustando uno a la vez.
 - **GPT-OSS y razonamiento:** el ejemplo oficial de razonamiento de Groq usa `temperature=0.6` y `top_p=0.95` con `openai/gpt-oss-20b`; esto ilustra una configuración válida, no un valor obligatorio.
 
 ## Reproducibilidad: seed, system_fingerprint y deriva
@@ -88,11 +119,6 @@ La semántica de `temperature` no es idéntica entre proveedores ni entre modelo
 | `seed` | Valor de semilla fijado, o `—` si no se fijó. |
 | `model` | `openai/gpt-oss-20b`. |
 | `system_fingerprint` | De `response.system_fingerprint` (si disponible). |
-| `prompt_tokens` | De `response.usage`. |
-| `completion_tokens` | De `response.usage` (incluye tokens de razonamiento). |
-| `total_tokens` | De `response.usage`. |
-| `reasoning_tokens` | De `usage.completion_tokens_details.reasoning_tokens` (si disponible). |
-| `estimated_theoretical_cost` | Estimación con tarifas de `settings` (`Decimal`); etiquetar `NOT BILLED`. |
 | `output` | Texto de `choices[0].message.content`. |
 
 > **Omisión explícita:** no registre `response.id` ni ningún identificador de respuesta.
@@ -103,44 +129,35 @@ La semántica de `temperature` no es idéntica entre proveedores ni entre modelo
 - Los **tokens de razonamiento se cuentan dentro de `completion_tokens`** (y por ende de `total_tokens`); la salida visible puede ser corta mientras `completion_tokens` es mayor.
 - La estimación de costo es **teórica a precio de lista**, no el cargo real; etiquétela como `NOT BILLED`.
 
-## Plan de arquitectura (no implementado)
+## Arquitectura implementada
 
-> Todo fragmento de esta sección es **PLANNED / pseudocódigo**. Ninguno existe aún; no se ha ejecutado `ruff`/`mypy`/`pytest` sobre ellos.
-
-### `sampling.py` — `validate_temperature` (PLANNED)
+### `sampling.py` — validación provider-neutral
 
 ```python
-# PLANNED (pseudocódigo): src/python_applied_ai/sampling.py
-# No existe aún. Se añade después de 02-06.
-
 from __future__ import annotations
+
+import math
 
 MIN_TEMPERATURE = 0.0
 MAX_TEMPERATURE = 2.0
 
 
 def validate_temperature(value: float) -> float:
-    """Return value if within Groq's documented 0.0-2.0 range.
-
-    Raises ValueError otherwise. Pure, provider-neutral guard.
-    """
+    """Return value if finite and inside the inclusive 0.0-2.0 range."""
+    if math.isnan(value) or math.isinf(value):
+        raise ValueError("temperature must be finite")
     if value < MIN_TEMPERATURE or value > MAX_TEMPERATURE:
-        raise ValueError(
-            f"temperature must be in [{MIN_TEMPERATURE}, {MAX_TEMPERATURE}], got {value}"
-        )
+        raise ValueError("temperature must be in [0.0, 2.0]")
     return value
 ```
 
-### Extensión de `call_ai` con `temperature` (PLANNED)
+El archivo real conserva mensajes de error más descriptivos. La idea esencial es validar **antes** de cualquier efecto externo.
 
-Firma coherente con 02-06 (`call_ai(client, question, settings) -> ChatCompletion`); se añade `temperature: float = 0.7`.
+### `call_ai` reenvía `temperature` y `seed`
+
+La firma de 02-06 se extendió con valores opcionales, por lo que los callers de tres argumentos siguen funcionando.
 
 ```python
-# PLANNED (pseudocódigo): extensión de call_ai definida en 02-06.
-# El tipo exacto del cliente (`Groq`) se confirma en 02-06; aquí se asume
-# el tipo del SDK de Groq. No inventamos un tipo final falso.
-# No se ha ejecutado ruff/mypy/pytest sobre este fragmento.
-
 from groq import Groq
 from groq.types.chat import ChatCompletion
 
@@ -153,101 +170,89 @@ def call_ai(
     question: str,
     settings: Settings,
     temperature: float = 0.7,
+    seed: int | None = None,
 ) -> ChatCompletion:
-    """Call Groq chat completions and return the full response.
-
-    Extiende la firma de 02-06 con `temperature` opcional (por defecto 0.7,
-    coherente con el valor actual). El dominio no imprime ni llama a SystemExit.
-    """
+    """Call Groq and return the complete chat response."""
     return client.chat.completions.create(
         model=settings.llm_model,
         messages=[{"role": "user", "content": question}],
         max_tokens=settings.llm_max_tokens,
         temperature=validate_temperature(temperature),
+        seed=seed,
         top_p=0.9,
     )
 ```
 
-### Harness de experimento separado (PLANNED)
+### Harness de experimento separado
+
+`TemperatureRow` es inmutable (`frozen=True`) y usa `slots=True`. El harness recibe todas sus dependencias por parámetro, valida **toda** la lista antes de la primera llamada y reenvía realmente la semilla al SDK.
 
 ```python
-# PLANNED (pseudocódigo): harness de experimento, separado de call_ai.
-# No forma parte del dominio; es una herramienta de estudio consciente de cuota.
-
-from decimal import Decimal
-from typing import Any
+from dataclasses import dataclass
 
 from groq import Groq
 
-from python_applied_ai.config import get_settings
+from python_applied_ai.config import Settings
 from python_applied_ai.hello_ai import call_ai
-from python_applied_ai.cost import estimate_cost_usd
+from python_applied_ai.sampling import validate_temperature
+
+
+@dataclass(frozen=True, slots=True)
+class TemperatureRow:
+    temperature: float
+    seed: int | None
+    model: str
+    system_fingerprint: str | None
+    output: str
 
 
 def run_temperature_sweep(
     client: Groq,
-    question: str,
+    settings: Settings,
+    prompt: str,
     temperatures: list[float],
     seed: int | None = None,
-) -> list[dict[str, Any]]:
-    """Itera cada valor de `temperatures` como una configuración de
-    experimento distinta, con UNA muestra en vivo por valor.
-
-    NO es un bucle de reintentos ni de muestreo repetido: cada temperatura
-    se evalúa una sola vez. NO sleeps, NO retries arbitrarios. Añada `2.0`
-    solo si la cuota lo permite.
-    """
-    settings = get_settings()
-    rows: list[dict[str, Any]] = []
-    # Cada temperatura es una configuración distinta del experimento:
-    # se evalúa UNA vez (una muestra en vivo), no es reintento ni bucle de muestreo.
+) -> list[TemperatureRow]:
     for temperature in temperatures:
-        response = call_ai(client, question, settings, temperature=temperature)
-        usage = response.usage
-        cost_text = "NOT BILLED (rates not configured)"
-        if (
-            usage is not None
-            and settings.llm_input_rate_per_million is not None
-            and settings.llm_output_rate_per_million is not None
-        ):
-            cost = estimate_cost_usd(
-                prompt_tokens=usage.prompt_tokens,
-                completion_tokens=usage.completion_tokens,
-                input_rate_per_million=settings.llm_input_rate_per_million,
-                output_rate_per_million=settings.llm_output_rate_per_million,
-            )
-            cost_text = f"{cost:.10f}"
+        validate_temperature(temperature)
+
+    rows: list[TemperatureRow] = []
+    for temperature in temperatures:
+        response = call_ai(
+            client,
+            prompt,
+            settings,
+            temperature=temperature,
+            seed=seed,
+        )
+        content = response.choices[0].message.content
         rows.append(
-            {
-                "temperature": temperature,
-                "seed": seed,
-                "model": response.model,
-                "system_fingerprint": getattr(response, "system_fingerprint", None),
-                "prompt_tokens": usage.prompt_tokens if usage else None,
-                "completion_tokens": usage.completion_tokens if usage else None,
-                "total_tokens": usage.total_tokens if usage else None,
-                "reasoning_tokens": (
-                    usage.completion_tokens_details.reasoning_tokens
-                    if usage and usage.completion_tokens_details
-                    else None
-                ),
-                "estimated_theoretical_cost": cost_text,
-                "output": response.choices[0].message.content,
-                # NOTA: no se registra response.id (omisión de IDs de respuesta).
-            }
+            TemperatureRow(
+                temperature=temperature,
+                seed=seed,
+                model=response.model,
+                system_fingerprint=getattr(response, "system_fingerprint", None),
+                output=content if content is not None else "",
+            )
         )
     return rows
 ```
 
-## Plan de TDD (RED → GREEN → offline)
+El archivo real añade defensas para respuestas sin choices/mensaje. El esquema omite deliberadamente `response.id`, tokens y costo: esas métricas pertenecen a 02-05/02-09, no al contrato mínimo del experimento de muestreo.
 
-Cero llamadas reales a la API en las pruebas.
+## Evidencia TDD (RED → GREEN → REFACTOR)
 
-### RED: pruebas de límites
+Cero llamadas reales a la API en las pruebas. Las fases se conservaron como historial pedagógico; el estado final está verde.
+
+### Fase 0: RED/GREEN — configuración productiva
+
+`tests/test_config.py` aporta 7 casos: default `0.7`, valor configurable y rechazo parametrizado de valores menores que 0, mayores que 2, `NaN` e infinitos. Esto prueba la entrada desde configuración antes de conectar el dominio.
+
+### Fase 1: RED — contrato de validación
+
+**Archivo:** `tests/test_sampling.py` — 9 casos para límites, valor por defecto, valor intermedio, `NaN` e infinitos.
 
 ```python
-# PLANNED (pseudocódigo): tests/test_sampling.py — fase RED.
-# No existe aún; estas pruebas fallan hasta implementar sampling.py.
 import pytest
 
 from python_applied_ai.sampling import validate_temperature
@@ -279,37 +284,46 @@ def test_rejects_above_two() -> None:
         validate_temperature(2.1)
 ```
 
-### GREEN: implementación del helper
+**RED observado:** el módulo no existía. **GREEN final:** 9 pruebas pasan y los valores no finitos también se rechazan.
 
-Implementar `validate_temperature` tal como se muestra en la sección de arquitectura (rechaza `<0` y `>2`, devuelve el valor en caso contrario). Tras implementarlo, las 6 pruebas anteriores pasan.
+### Fase 2: GREEN — helper puro
 
-### Prueba offline con cliente falso (reenvío de temperature)
+**Archivo:** `src/python_applied_ai/sampling.py`. `validate_temperature` rechaza valores fuera de `0..2`, `NaN` e infinitos; devuelve sin alterar cualquier valor finito válido.
+
+**Resultado:** las 9 pruebas de `test_sampling.py` pasan.
+
+### Fase 3: GREEN/REFACTOR — `call_ai` + cliente falso
+
+**Archivo:** `tests/test_call_ai_temperature.py` — 4 casos que verifican defaults, compatibilidad, validación previa y reenvío real de `temperature`/`seed`.
 
 ```python
-# PLANNED (pseudocódigo): tests/test_call_ai_temperature.py — offline.
 from unittest.mock import MagicMock
 
-from python_applied_ai.hello_ai import call_ai  # con la extensión de temperatura
+from python_applied_ai.hello_ai import call_ai
 
 
-def test_call_ai_forwards_temperature() -> None:
+def test_call_ai_forwards_temperature_and_seed() -> None:
     fake_client = MagicMock()
     fake_client.chat.completions.create.return_value = MagicMock()
     settings = MagicMock()
     settings.llm_model = "openai/gpt-oss-20b"
     settings.llm_max_tokens = 256
 
-    call_ai(fake_client, "hi", settings, temperature=1.2)
+    call_ai(fake_client, "hi", settings, temperature=1.2, seed=42)
 
     fake_client.chat.completions.create.assert_called_once()
     _, kwargs = fake_client.chat.completions.create.call_args
     assert kwargs["temperature"] == 1.2
+    assert kwargs["seed"] == 42
 ```
 
-### Prueba del harness con cliente falso
+**Resultado:** 4 pruebas pasan; un valor inválido falla antes de llamar al cliente.
+
+### Fase 4: REFACTOR — harness con cliente falso
+
+**Archivo:** `tests/test_experiment_harness.py` — 12 pruebas de filas, orden, semilla, fingerprint opcional, contenido vacío, inmutabilidad, ausencia de IDs y atomicidad de validación.
 
 ```python
-# PLANNED (pseudocódigo): tests/test_experiment_harness.py — offline.
 from unittest.mock import MagicMock
 
 from python_applied_ai.experiment_temperature import run_temperature_sweep
@@ -341,21 +355,38 @@ def test_sweep_records_rows_without_network() -> None:
     settings.llm_input_rate_per_million = None
     settings.llm_output_rate_per_million = None
 
-    rows = run_temperature_sweep(fake_client, "q", [0.0, 0.7, 1.2])
+    rows = run_temperature_sweep(
+        fake_client,
+        settings,
+        "q",
+        [0.0, 0.7, 1.2],
+        seed=42,
+    )
     assert len(rows) == 3
-    assert rows[0]["temperature"] == 0.0
-    # Sin IDs de respuesta en las filas.
-    assert "id" not in rows[0]
+    assert rows[0].temperature == 0.0
+    assert rows[0].seed == 42
 ```
+
+**Resultado:** 12 pruebas pasan; toda temperatura se valida antes del primer efecto externo y cada configuración produce exactamente una llamada.
+
+### No determinismo y límites del proveedor
+
+- `temperature`: controla la entropía de muestreo; `0.0` reduce aleatoriedad pero **no** garantiza salida idéntica.
+- `seed`: determinismo best-effort; combine con temperatura baja (0.0–0.3) para mejor reproducibilidad.
+- `system_fingerprint`: monitoree `response.system_fingerprint` para detectar cambios de backend/modelo entre corridas.
+- Límites del proveedor: `temperature` rango documentado 0–2; `top_p` rango 0–1. Valores fuera de rango deben ser rechazados por `validate_temperature`.
+- Una sola muestra **nunca** es prueba estadística; el backend puede cambiar independientemente de `seed`.
 
 ## Procedimiento manual del experimento
 
-1. Complete primero [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) (define `call_ai`).
-2. Añada `sampling.py` con `validate_temperature` y extienda `call_ai` con `temperature` (ver plan de arquitectura).
-3. Cree el harness `experiment_temperature.py` por separado.
-4. Ejecute **una** muestra en vivo por temperatura: `0.0`, `0.7`, `1.2`. Añada `2.0` solo si su cuota lo permite.
-5. Registre cada fila con el esquema de la sección "Esquema de registro" (sin `response.id`).
-6. Compare las salidas; no concluya patrones a partir de una sola muestra.
+1. Confirme que las pruebas offline y los checks de calidad están verdes.
+2. Revise `sampling.py`, el forwarding de `call_ai` y la pre-validación del harness.
+3. Configure cliente y `Settings` desde el límite de composición existente; nunca imprima la API key.
+4. Opcionalmente ejecute **una** muestra en vivo por temperatura (`0.0`, `0.7`, `1.2`) desde una sesión controlada. Añada `2.0` solo si su cuota lo permite.
+5. Registre únicamente los campos de `TemperatureRow`; nunca `response.id`.
+6. Compare las salidas sin convertir una muestra por configuración en una conclusión estadística.
+
+> El paso 4 **no se ejecutó** durante esta implementación. El harness no expone un CLI automático para impedir consumo accidental de cuota.
 
 ## Observaciones esperadas (sin prometer salidas exactas)
 
@@ -382,34 +413,40 @@ def test_sweep_records_rows_without_network() -> None:
 
 ## Checklist de aceptación
 
-- [ ] `validate_temperature` rechaza `<0` y `>2`, y acepta `0`, `0.7`, `1.2`, `2`.
-- [ ] `call_ai` acepta `temperature: float = 0.7` y lo reenvía a `client.chat.completions.create`.
-- [ ] El harness de experimento está separado del dominio `call_ai`.
-- [ ] La integración con `Settings` se difiere (aún no se añade temperatura a `Settings`).
-- [ ] Las pruebas son 100% offline (MagicMock/fake client), cero llamadas reales.
-- [ ] El experimento en vivo usa una muestra por temperatura; sin bucles ni `sleep`/reintentos.
-- [ ] El esquema de registro omite `response.id` y cualquier ID de respuesta.
-- [ ] `uv run ruff format --check .`, `ruff check .`, `mypy src` y `pytest` en verde (al implementar).
-- [ ] [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) está implementado antes de esta lección.
+### Documentación y conceptos (completos)
+- [x] `temperature` y su rango documentado 0–2 en Groq documentado.
+- [x] `temperature=0` reduce aleatoriedad pero no garantiza salida idéntica.
+- [x] `seed` ofrece determinismo best-effort; `system_fingerprint` permite detectar cambios de backend.
+- [x] `top_p` es parámetro de muestreo separado (rango 0–1); no cambiar junto a `temperature`.
+- [x] Experimento controlado: una muestra por temperatura, sin bucles ni `sleep`/reintentos.
+- [x] Esquema de registro sin `response.id` ni ningún ID de respuesta.
+- [x] Prerrequisitos 02-05 y 02-06 completados.
+
+### Implementación, harness y tests
+- [x] `validate_temperature` acepta `0`, `0.7`, `1.2`, `2` y rechaza rango inválido, `NaN` e infinitos.
+- [x] `call_ai` acepta y reenvía `temperature: float = 0.7` y `seed: int | None = None`.
+- [x] `Settings.llm_temperature` valida defaults, valores configurados, rango y números no finitos.
+- [x] El harness está separado, recibe `Settings` y cliente por parámetro y pre-valida toda la secuencia.
+- [x] `TemperatureRow` es inmutable y omite IDs de respuesta y secretos.
+- [x] Las pruebas son 100 % offline; cero llamadas reales y cero cuota consumida.
+- [x] El harness realiza una llamada por temperatura, sin `sleep`, retries ni loops ocultos.
+- [x] Ruff, mypy, pytest y `git diff --check` están verdes.
+- [ ] Experimento live opcional ejecutado manualmente (no requerido para cerrar la implementación).
 
 ## Comandos de verificación
 
 ```bash
 uv run ruff format --check .
-uv run ruff check .
-uv run mypy src
-uv run pytest
-# Experimento manual (en vivo, fuera de las pruebas automatizadas):
-uv run python -m python_applied_ai.experiment_temperature  # PLANNED, no existe aún
+uv run ruff check src tests
+uv run mypy src tests
+uv run pytest -q  # 46 tests acumulados en esta etapa
 ```
 
-> El experimento en vivo es manual y consciente de cuota; no forma parte de la verificación automatizada (que debe ser offline).
+La verificación automatizada es 100 % offline. `experiment_temperature.py` es una API de estudio testeable, no un entrypoint que haga llamadas al importarlo o ejecutarlo accidentalmente.
 
 ## Siguiente paso
 
-Implemente primero [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md); esta lección 02-07 depende de `call_ai`. El eje `reasoning_effort` (distinto de `temperature`) se cubre en la documentación oficial de razonamiento de Groq, no en este experimento.
-
-La siguiente lección, [02-08-cli-chatbot-conversation-history.md](./02-08-cli-chatbot-conversation-history.md) (Planned), introduce la clase de dominio `ChatBot` con historial de conversación tipado; aún no está implementada.
+La configuración de muestreo queda integrada y el laboratorio está cubierto offline. Continúe con [02-08-cli-chatbot-conversation-history.md](./02-08-cli-chatbot-conversation-history.md), que construye `ChatBot` usando `settings.llm_temperature` desde el primer turno.
 
 ## Referencias externas oficiales
 

@@ -4,7 +4,7 @@
 
 ## Estado
 
-**Completed** — la cuenta del Free Plan, la API key y el archivo `.env` ya están configurados y verificados.
+**Completed — etapa 2 de 9.** Parte del scaffold de 02-02 y añade únicamente la credencial privada y su verificación segura. No realiza todavía llamadas a Groq ni añade tests; el checkpoint acumulado continúa en **1 test**.
 
 ## Objetivo de aprendizaje
 
@@ -27,7 +27,7 @@ La lección original "Obtener API key / costos" del curso cubre: registro en la 
 | Concepto (OpenAI original) | Adaptación Groq |
 | --- | --- |
 | Cuenta en `platform.openai.com` | Cuenta en `console.groq.com` |
-| API key de OpenAI (`OPENAI_API_KEY`) | API key de GroqCloud (`GROQ_API_KEY` no aplica; se usa `GROQ_API_KEY` como variable del proyecto) |
+| API key de OpenAI (`OPENAI_API_KEY`) | API key de GroqCloud (`GROQ_API_KEY`) |
 | Modelo por defecto `gpt-*` | `openai/gpt-oss-20b` |
 | Explicación de costos OpenAI | Explicación de costos/límites de Groq |
 
@@ -82,11 +82,14 @@ El formato de salida es `<fuente>:<línea>:<patrón> <ruta>`; el último token e
 
 **Prohibido**: `cat .env` (expone la key en pantalla), añadir `.env` a un commit, o pegarlo en issues/chat. Para validar la presencia de la key de forma segura, use el smoke test del siguiente documento (que la lee vía el objeto `Settings` y no la imprime). No se fíe de comprobar `os.environ`: cargar `.env` con `pydantic-settings` **no** exporta las variables al entorno del proceso.
 
-## Estado actual
+**Validación segura**: la clave solo se verifica por presencia/ausencia bajo el nombre `GROQ_API_KEY`; nunca se imprime, registra ni se incluye en logs. Si falta, el sistema avisa sin tracear y sale. La key nunca se pasa como argumento de cadena formateada.
 
-- Cuenta Groq Free Plan, API key y `.env` ya completos y verificados.
+## Resultado de etapa y siguiente paso
+
+- Cuenta Groq, API key y `.env` configurados sin exponer el secreto.
 - `git check-ignore -v .env` confirma que `.env` está ignorado.
 - `.env.example` commiteado con `GROQ_API_KEY=` (vacío).
+- Siguiente incremento: [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md).
 
 ## Decisiones, trade-offs y errores comunes
 
@@ -94,6 +97,7 @@ El formato de salida es `<fuente>:<línea>:<patrón> <ruta>`; el último token e
 - **No inventar etiquetas de UI**: los textos de la consola pueden cambiar; siga el equivalente funcional en pantalla.
 - **No `cat .env`**: exponer la key en scrollback es una fuga accidental; si ocurre, revoque y rote.
 - **No usar `os.environ` para validar**: `pydantic-settings` no exporta a `os.environ`.
+- **Auth/rate limit**: si recibe `AuthenticationError`, la key es inválida o fue revocada; si recibe `RateLimitError`, respete los límites de la organización (RPM/RPD/TPM/TPD) y espere antes de reintentar. No bucleante; el SDK reintenta con backoff para errores reintentables.
 
 ## Referencias externas oficiales
 

@@ -4,7 +4,7 @@
 
 ## Estado
 
-**Implementación: Completed; Documentación: Completed; Cierre Git local y remoto: Completed** — el prerrequisito [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) está completo (llamada en vivo Groq + tarea de tres lenguas). Tanto la fase **requerida** (reporte de tokens/metadatos sobre el MISMO `response`) como la fase **opcional** (estimación de costo `Decimal` en `cost.py` + `tests/test_cost.py`) están **implementadas y verificadas en vivo**. `report_usage(response, settings)` imprime `response.id`, `response.model`, `response.usage` y una estimación teórica de costo, con guardas `is None` para `usage` y `completion_tokens_details`, y la función pura `estimate_cost_usd(...)` recibe las tarifas por parámetro con guardas contra valores negativos. Las tarifas opcionales tipadas se configuran mediante los placeholders en blanco `LLM_INPUT_RATE_PER_MILLION=` / `LLM_OUTPUT_RATE_PER_MILLION=` de `.env.example` (decisión #8684); los valores reales privados viven solo en `.env` ignorado por Git; no hay precios numéricos rastreados ni hardcodeados. **Cierre Git local y remoto completado**: los commits `d35af37` (`feat: add Groq token usage, cost estimation, and course notes`, que incluye el código y esta nota de estudio) y `1093d06` ya están publicados en `origin/main`. Siguiente lección: [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md).
+**Completed — etapa 4 de 9.** Parte de la primera llamada de 02-04 y añade reporte de uso y costo teórico con `Decimal`. Incorpora **7 pruebas puras** de costo; junto al test de infraestructura, el checkpoint acumulado es **8 tests**.
 
 ## Objetivo de aprendizaje
 
@@ -14,8 +14,8 @@ Inspeccionar, tras una llamada a la API de Groq, los metadatos de respuesta (`re
 
 1. (Hecho) [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) (`config.py` y `hello_ai.py`) completo — prerrequisito.
 2. (Hecho — fase requerida) `hello_ai.py` ampliado: `main` hace una sola llamada y `report_usage(response, settings)` imprime `response.id`, `response.model` y `response.usage` (guardas `usage is None` y `completion_tokens_details is not None`) y, si hay tarifas configuradas, la estimación `NOT BILLED`. Verificado en vivo.
-3. (Hecho — fase opcional) `src/python_applied_ai/cost.py` creado con la función pura `estimate_cost_usd(prompt_tokens, completion_tokens, input_rate_per_million, output_rate_per_million) -> Decimal` (guardas contra valores negativos) y `tests/test_cost.py` con 7 pruebas puras sin red (ejemplo normal, cero tokens, precisión/redondeo, parámetros negativos). El repositorio completo pasa 8 pruebas en total (7 de `tests/test_cost.py` + 1 preexistente `tests/test_package.py`). La función recibe tarifas por parámetro; las tarifas opcionales tipadas se cargan desde `.env.example` (placeholders en blanco, decisión #8684) vía `Settings`, con `env_ignore_empty=True` para que los blancos sean `None`. `ruff format .`, `ruff check .`, `mypy src` y `pytest` pasan.
-4. (Hecho) Comprobaciones ejecutadas: `ruff format .`, `ruff check .`, `mypy src` (strict) y `pytest` (8 pruebas en total del repositorio: 7 de `tests/test_cost.py` + 1 preexistente `tests/test_package.py`) sin errores; ejecución en vivo exitosa.
+3. (Hecho — fase opcional) `src/python_applied_ai/cost.py` contiene `estimate_cost_usd(...) -> Decimal` y `tests/test_cost.py` aporta **7 pruebas** puras sin red. El checkpoint acumulado pasa a **8 tests**.
+4. (Hecho) Ruff, mypy y **8 tests acumulados** sin errores; la ejecución en vivo de uso/costo también fue exitosa.
 5. (Hecho) Checklist de aceptación diligenciado: ítems de reporte, estimación, guardas, configuración tipada, gates de calidad y sin secretos en `[x]`.
 
 ## Resumen del concepto del instructor
@@ -77,7 +77,7 @@ Si está presente, el desglose de razonamiento está en `usage.completion_tokens
 
 ## Diseño recomendado: estimación de costo neutral al proveedor
 
-**Implementado (fase opcional):** una función pura `estimate_cost_usd(prompt_tokens, completion_tokens, input_rate_per_million, output_rate_per_million) -> Decimal` en `src/python_applied_ai/cost.py`, separado de `hello_ai.py` para que la refactorización de manejo de errores de [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) no colisione con él. Usa `Decimal` para evitar errores de redondeo de punto flotante binario y **no** conoce ningún proveedor ni tarifa concreta: la función recibe las tarifas por parámetro (y rechaza valores negativos con `ValueError`). Se acompaña de `tests/test_cost.py` con 7 pruebas puras sin red (el repositorio pasa 8 en total: 7 de `tests/test_cost.py` + 1 preexistente `tests/test_package.py`). `main` reutiliza el MISMO `response.usage` existente (sin segunda llamada ni cuota extra) y `report_theoretical_cost` etiqueta la salida como "THEORETICAL LIST-PRICE ESTIMATE — NOT BILLED". Las tarifas opcionales se leen de `Settings` (cargadas desde `.env.example` en blanco, decisión #8684), no hardcodeadas.
+**Implementado (fase opcional):** `estimate_cost_usd(...) -> Decimal` vive en `src/python_applied_ai/cost.py`, separado de `hello_ai.py`. Es puro, provider-neutral, recibe tarifas por parámetro y rechaza valores negativos. `tests/test_cost.py` aporta 7 pruebas sin red. `main` reutiliza el MISMO `response.usage` y `report_theoretical_cost` etiqueta la salida como `NOT BILLED`; las tarifas opcionales se cargan desde `Settings`, nunca se hardcodean.
 
 ### Variables de precio en `.env.example` (decisión #8684)
 
@@ -255,7 +255,7 @@ uv run pytest
 - `uv run python -m python_applied_ai.hello_ai` imprime la respuesta, los metadatos de uso y la estimación `NOT BILLED` (si hay tarifas), reutilizando el mismo `response`.
 - `ruff format .` y `ruff check .` sin errores.
 - `mypy` (modo strict, con `warn-unreachable`) sin errores de tipos.
-- `pytest` pasa las 7 pruebas de `tests/test_cost.py` (comportamiento puro de `estimate_cost_usd`); en total el repositorio pasa 8 pruebas (7 de `tests/test_cost.py` + 1 preexistente `tests/test_package.py`). `report_usage` se verificó en vivo, no tiene prueba unitaria propia.
+- `pytest` pasa las **7 pruebas** de costo y el test de infraestructura: **8 tests acumulados**. `report_usage` se verifica mediante el smoke live de esta etapa.
 
 ### Evidencia de tokens en vivo (fase requerida + estimación opcional)
 
@@ -277,11 +277,11 @@ Ejecución en vivo con modelo `openai/gpt-oss-20b` (modelo de razonamiento) sobr
 - [x] `hello_ai.py` reporta `response.id`, `response.model` y `response.usage` reutilizando el MISMO `response` (una sola llamada).
 - [x] Se protege `response.usage is None`.
 - [x] Se protege `completion_tokens_details is not None` antes de `reasoning_tokens`.
-- [x] `estimate_cost_usd(...)` en `cost.py` usa `Decimal`, recibe tarifas por parámetro y rechaza valores negativos; `tests/test_cost.py` (7 pruebas) puro sin red — **hecho**. El repositorio completo pasa 8 pruebas en total (7 de `tests/test_cost.py` + 1 preexistente `tests/test_package.py`).
+- [x] `estimate_cost_usd(...)` usa `Decimal`, recibe tarifas por parámetro y rechaza valores negativos; `tests/test_cost.py` aporta 7 pruebas puras sin red.
 - [x] `config.py` expone `llm_input_rate_per_million` / `llm_output_rate_per_million` (`Decimal | None`) con `env_ignore_empty=True`; `.env.example` trae placeholders en blanco (decisión #8684).
 - [x] `main()` llama a `report_usage(response, settings)`, que imprime la estimación `THEORETICAL LIST-PRICE ESTIMATE — NOT BILLED` (sin almacenar `response.id`).
 - [x] No hay precios numéricos hardcodeados; `.env.example` solo lleva placeholders en blanco y los valores reales viven en `.env` ignorado.
-- [x] `uv run ruff format .`, `ruff check .`, `mypy src` (strict) y `pytest` (8 pruebas en total del repositorio: 7 de `tests/test_cost.py` + 1 preexistente `tests/test_package.py`) sin errores. Nota: `report_usage` se verificó en vivo; no tiene prueba unitaria propia.
+- [x] Ruff, mypy y pytest pasan **8 tests acumulados** en este checkpoint.
 - [x] No se commitea `.env` ni secretos.
 
 ## Decisiones, trade-offs y errores comunes
@@ -294,13 +294,13 @@ Ejecución en vivo con modelo `openai/gpt-oss-20b` (modelo de razonamiento) sobr
 - **Free Plan ≠ ilimitado**: el uso y las cuotas son reales; la estimación a precio de lista es teórica y el costo facturado real = 0 dentro de límites, pero las cuotas existen y cambian.
 - **`response.id` se imprime, no se almacena**: útil para diagnóstico, pero no se guarda en variables ni logs persistentes combinado con secretos.
 
-## Estado actual y siguiente paso
+## Resultado de etapa y siguiente paso
 
-La fase **requerida** (reporte de tokens/metadatos con `report_usage(response, settings)`) y la fase **opcional** (estimación de costo `Decimal` en `cost.py` + `tests/test_cost.py`, 7 pruebas) están **completadas y verificadas en vivo**; el repositorio completo pasa 8 pruebas en total (7 de `tests/test_cost.py` + 1 preexistente `tests/test_package.py`). El prerrequisito [02-04-first-groq-api-call.md](./02-04-first-groq-api-call.md) sigue completo. **Implementación, documentación y sincronización Git local+remota completadas**: los commits `d35af37` (`feat: add Groq token usage, cost estimation, and course notes`) y `1093d06` ya están publicados en `origin/main`. **La siguiente lección es** [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) (manejo tipado y testeable de errores de la API de Groq), que se mantiene **Planned** y secuenciada después de este paso.
+La aplicación conserva una sola llamada, reporta uso y calcula costo teórico sin hardcodear tarifas. El checkpoint queda en **8 tests**. Continúe con [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md).
 
 ## Mensaje de commit sugerido
 
-El cierre de la lección ya está publicado en `origin/main` mediante los commits `d35af37` (`feat: add Groq token usage, cost estimation, and course notes`) y `1093d06`, que incluyen el código y esta nota de estudio. No quedan pasos de `push` pendientes; la siguiente lección es [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md).
+Los commits históricos `d35af37` y `1093d06` sirven como referencia de esta etapa; no son un requisito para comprender el delta pedagógico.
 
 ## Referencias externas oficiales
 

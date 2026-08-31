@@ -4,22 +4,22 @@
 
 ## Estado
 
-**Completed** — segunda parte del proyecto de chatbot CLI. Requiere la implementación completada de [02-08-cli-chatbot-conversation-history.md](./02-08-cli-chatbot-conversation-history.md). Esta guía documenta el contrato ya implementado en `src/python_applied_ai/chatbot_cli.py` y verificado offline en `tests/test_chatbot_cli.py`.
+**Completed — etapa 8 de 9.** Parte de los 51 tests de 02-08 y añade `ChatTurn`, `SessionStats`, acumulación atómica, costo teórico y reset. Incorpora 8 casos offline; el checkpoint acumulado queda en **59 tests**. El bucle CLI se reserva para 02-10.
 
-Evidencia verificada (árbol limpio en HEAD `f696e22`, rama `origin/main`, antes de los docs):
+Evidencia de esta etapa:
 - `ChatTurn` y `SessionStats` (`@dataclass(frozen=True, slots=True)`) ya definidos.
 - API pública `stats()` y `reset_session()` implementadas.
-- Costo teórico exacto con `Decimal` vía `estimate_cost_usd` (commit `ac63d90`).
-- Commits relevantes: `4979ed3` (`ChatTurn`), `e777b77` (`SessionStats`/acumulación), `ac63d90` (costo `Decimal` exacto), `fd4bd5f` (`reset_session`), `f696e22` (caracterización).
+- Costo teórico exacto con `Decimal` vía `estimate_cost_usd`.
+- Commits relevantes: `4979ed3` (`ChatTurn`), `e777b77` (`SessionStats`/acumulación), `ac63d90` (costo `Decimal` exacto), `fd4bd5f` (`reset_session`).
 - `uv run ruff format --check .` y `uv run ruff check .` limpios.
 - `uv run mypy src tests` sin errores en 9 archivos.
-- `uv run pytest tests/test_chatbot_cli.py -q` = **13 passed** (5 heredados de 02-08 + 8 agregados en esta lección).
-- `uv run pytest -q` = **27 passed** (suite completa).
+- `tests/test_chatbot_cli.py` alcanza **13 casos**: 5 de 02-08 + 8 de 02-09.
+- `uv run pytest -q` alcanza **59 tests acumulados**.
 - Validación 100% offline: ninguna llamada en vivo a la API.
 
-## Resultado (ya implementado)
+## Resultado de la etapa
 
-El chatbot conserva estadísticas **solo de la sesión actual**: turnos exitosos, tokens de entrada, tokens de salida, tokens totales y, cuando existan tarifas configuradas, una estimación teórica con `Decimal`. La interfaz CLI para mostrar estos datos queda en [02-10-cli-chatbot-loop-and-integration.md](./02-10-cli-chatbot-loop-and-integration.md).
+El chatbot conserva estadísticas **solo de la sesión actual**: turnos exitosos, tokens de entrada, salida y totales; cuando hay tarifas, añade una estimación teórica con `Decimal`. La presentación de estos datos se implementa después, en 02-10.
 
 ## Ruta de implementación
 
@@ -31,12 +31,15 @@ El chatbot conserva estadísticas **solo de la sesión actual**: turnos exitosos
 
 ## Alcance y no objetivos
 
-| Incluido (implementado en esta lección) | Diferido a 02-10 o posterior |
+| Incluido (implementado) | Completado en |
 | --- | --- |
-| Contrato de resultado de un turno (`ChatTurn`) | Bucle `input()` y presentación terminal |
-| Acumulación en memoria de uso/costo teórico | Cobro real, facturación o persistencia |
-| API pública `stats()` y `reset_session()` | Ventanas de contexto, resumen o RAG |
-| Pruebas unitarias offline | Llamadas reales para provocar errores |
+| Contrato de resultado de un turno (`ChatTurn`) | 02-09 |
+| Acumulación en memoria de uso/costo teórico | 02-09 |
+| API pública `stats()` y `reset_session()` | 02-09 |
+| Bucle `input()` y presentación terminal (`run_cli`, `format_stats`) | 02-10 |
+| Pruebas unitarias offline | 02-09 |
+
+02-10 consumirá estas APIs públicas para construir el bucle interactivo y `format_stats`.
 
 El costo calculado es una **estimación de precio de lista**, no una factura. Si faltan tarifas en la configuración, el costo teórico es desconocido (`None`), no cero.
 
@@ -74,7 +77,9 @@ class SessionStats:
 
 Los consumidores (02-10) imprimen `turn.text` y usan `turn.usage` si lo necesitan. No se trata una cadena como si tuviera `.usage`.
 
-## Acumulación atómica
+## Acumulación atómica y nota técnica
+
+`SessionStats` es una **snapshot inmutable** (`@dataclass(frozen=True, slots=True)`): el estado de la sesión se captura en un momento dado y no se muta después. La acumulación es atómica: solo se confirma tras un turno exitoso. Si `chat()` lanza una excepción tipada (p. ej. `APIConnectionError`), no se suman tokens, costo ni turnos, y `stats()` sigue devolviendo el snapshot anterior.
 
 Tras obtener una `ChatCompletion` exitosa, el chatbot sigue este orden:
 
@@ -83,8 +88,6 @@ Tras obtener una `ChatCompletion` exitosa, el chatbot sigue este orden:
 3. Calcular los nuevos totales candidatos sin mutar el estado actual.
 4. Confirmar juntos historial, contador de turnos y estadísticas.
 5. Retornar el `ChatTurn`.
-
-Una `APIConnectionError` u otra excepción tipada se propaga desde 02-08: no suma tokens, costo ni turnos, y no altera el historial ni `stats()`.
 
 ### Fórmula y tarifas
 
@@ -125,57 +128,24 @@ else:
 
 Antes de llamar al estimador, ambas tarifas deben ser `Decimal` y no `None`. `reasoning_tokens`, cuando el proveedor los informa, forman parte del presupuesto de completación para GPT-OSS; no se suman otra vez al costo.
 
-## Contrato de estadísticas y reset
+### `reset_session` y nota técnica
 
-- `stats() -> SessionStats`: devuelve una **snapshot inmutable** del estado actual de la sesión. Es una API pública; el bucle de 02-10 la invocará para presentar el resumen.
-- `reset_session() -> None`: restaura el chatbot a su estado inicial: conserva solo el mensaje `system` y reinicia historial y estadísticas. El futuro `main` no debe modificar `bot.history` directamente.
+- `reset_session() -> None`: restaura el chatbot a su estado inicial; conserva solo el mensaje `system` y reinicia historial y estadísticas al snapshot cero.
 - `turn_count` aumenta una vez por cada completación exitosa, incluso si el contenido visible es `""` (contrato de 02-08).
 - Los acumulados de tokens solo aumentan cuando `usage` está disponible.
 - Los valores son de una ejecución del proceso; no se persisten ni representan facturación real.
-
-Estado inicial/reset de costo (método interno `_build_initial_stats`):
-
-```python
-def _build_initial_stats(self) -> SessionStats:
-    """Build a zeroed session snapshot with rate-aware cost."""
-
-    both_rates_configured = (
-        self.settings.llm_input_rate_per_million is not None
-        and self.settings.llm_output_rate_per_million is not None
-    )
-    initial_cost = Decimal("0") if both_rates_configured else None
-
-    return SessionStats(
-        turn_count=0,
-        prompt_tokens=0,
-        completion_tokens=0,
-        total_tokens=0,
-        theoretical_cost_usd=initial_cost,
-    )
-```
-
-`reset_session` reutiliza ese mismo constructor:
-
-```python
-def reset_session(self) -> None:
-    """Restore the chatbot to its initial session state."""
-
-    system_message = self._build_system_message()
-    initial_stats = self._build_initial_stats()
-
-    self.history[:] = [system_message]
-    self._stats = initial_stats
-```
+- **Separación dominio/presentación:** el dominio no imprime; el bucle de 02-10 consume `stats()` y `reset_session()` para renderizar.
 
 ### Clarificación de costo
 
 - **Falta alguna tarifa** (`input_rate` o `output_rate` es `None`): `theoretical_cost_usd` es `None`, no un precio inventado.
 - **Ambas tarifas configuradas** y uso cero, o tras `reset_session()`: `Decimal("0")`.
 - Los valores acumulados son **estimaciones de precio de lista teórico**, no una factura ni cobro real. No se documentan tarifas privadas ni se realizan llamadas para medir costo.
+- El tipo `Decimal` evita errores de redondeo monetario; las tarifas son `Decimal | None` opcionales en `Settings`; hoy no se exige su configuración.
 
 ## Plan de pruebas offline
 
-Todos los casos usan `MagicMock`, `cast(Groq, ...)`, `Settings.model_construct` solo en tests y una `ChatCompletion` falsa con uso en memoria. El archivo `tests/test_chatbot_cli.py` tiene **13** pruebas (5 heredadas de 02-08 + 8 de esta lección); la suite completa es **27**.
+Todos los casos usan `MagicMock`, `cast(Groq, ...)`, `Settings.model_construct` solo en tests y una `ChatCompletion` falsa. En este checkpoint, `tests/test_chatbot_cli.py` tiene **13 pruebas** y la suite acumulada, **59**.
 
 | ID | Caso (función de prueba) | Comportamiento verificado |
 | --- | --- | --- |
@@ -199,34 +169,33 @@ Los datos `CompletionUsage` falsos incluyen `prompt_tokens`, `completion_tokens`
 
 - No usar `len(history) // 2` para turnos: los mensajes de sistema, resets, contenido vacío y futuras herramientas invalidan esa inferencia.
 - No usar `float`: la precisión monetaria pertenece a `Decimal` y al estimador existente.
-- No imprimir estadísticas desde el dominio: 02-10 decide el formato de presentación (`format_stats`).
+- No imprimir estadísticas desde el dominio: la presentación (`format_stats`) corre en el bucle de 02-10; el dominio solo expone `stats()` y `reset_session()`.
 - `max_tokens` sigue deprecado por el SDK en favor de `max_completion_tokens`; esta lección no cambia el parámetro sin una migración verificada.
+- `SessionStats` snapshot inmutable: los acumulados se capturan por valor y no se mutan tras la creación; la acumulación atómica solo se produce tras un turno exitoso.
 
 ## Checklist de aceptación
 
-- [x] `ChatTurn` separa texto y uso de proveedor.
-- [x] `SessionStats` representa acumulados de una sola sesión.
-- [x] La acumulación ocurre solo tras completación exitosa.
+- [x] `SessionStats` snapshot inmutable; acumulación atómica solo tras turno exitoso.
+- [x] `reset_session()` conserva el mensaje `system` y reinicia al snapshot cero.
 - [x] Faltan tarifas → costo `None`, no un precio inventado.
 - [x] Se reutiliza `estimate_cost_usd` con `Decimal`.
-- [x] Existe reset público (`reset_session()`) que conserva el mensaje `system`.
-- [x] `stats()` expone una snapshot inmutable de la sesión.
+- [x] Separación dominio/presentación: el dominio no imprime; `format_stats` corre en 02-10.
 - [x] Pruebas offline cubren éxito, tarifas ausentes, error, vacío, reset y caracterización de costo exacto.
-- [x] Ruff, mypy y pytest pasan (13 pruebas del chatbot, 27 en total).
+- [x] Ruff, mypy y pytest pasan (13 pruebas chatbot; 59 acumuladas).
 
 ## Comandos de verificación (ejecutados)
 
 ```bash
-uv run ruff format --check .   # 19 files already formatted
-uv run ruff check .             # All checks passed!
-uv run mypy src tests           # Success: no issues found in 9 source files
-uv run pytest tests/test_chatbot_cli.py -q   # 13 passed
-uv run pytest -q                # 27 passed
+uv run ruff format --check .
+uv run ruff check .
+uv run mypy src tests
+uv run pytest tests/test_chatbot_cli.py -q   # 13 tests en este checkpoint
+uv run pytest -q                             # 59 tests acumulados
 ```
 
 ## Siguiente paso
 
-El contrato de 02-09 está implementado y verificado offline. [02-10-cli-chatbot-loop-and-integration.md](./02-10-cli-chatbot-loop-and-integration.md) (Planificado) conectará las APIs públicas (`chat`, `stats`, `reset_session`) con una terminal interactiva y definirá `format_stats`/el bucle `run_cli`.
+El dominio ya devuelve `ChatTurn`, acumula snapshots inmutables y puede resetearse sin imprimir. Continúe con [02-10-cli-chatbot-loop-and-integration.md](./02-10-cli-chatbot-loop-and-integration.md) para conectar estas APIs al producto CLI final.
 
 ## Referencias oficiales
 

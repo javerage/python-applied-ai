@@ -24,7 +24,9 @@ uv sync
 cp .env.example .env
 ```
 
-Edit .env and add your provider keys. .env is ignored by Git.
+Edit `.env`, add your provider keys, and adjust `LLM_TEMPERATURE` only when the
+use case requires a different sampling profile. The accepted range is `0.0` to
+`2.0`; the default is `0.7`. `.env` is ignored by Git.
 
 ## Quality
 ```bash

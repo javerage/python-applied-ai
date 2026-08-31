@@ -4,7 +4,7 @@
 
 ## Estado
 
-**Completed** — lección de la sección 2, secuenciada **después** de [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) (ya completado y sincronizado) y **antes** de [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md). La refactorización de `hello_ai.py` está implementada y verificada offline: `call_ai` tipada, `main` como límite de presentación/salida, y `tests/test_hello_ai.py` con 6 casos en verde. Evidencia de verificación: `ruff format --check .` limpio (14 archivos), `ruff check .` sin fallos, `mypy src tests --strict` sin problemas en 7 archivos, `pytest tests/test_hello_ai.py` = 6 passed, `pytest` completo = 14 passed. No se realizaron llamadas reales a la API para verificar el manejo de errores.
+**Completed — etapa 5 de 9.** Parte de los 8 tests de 02-05 y añade 6 casos offline para errores tipados, atomicidad y mensajes seguros. El checkpoint acumulado queda en **14 tests**. No se provocan errores mediante llamadas reales.
 
 ## Objetivo de aprendizaje
 
@@ -59,6 +59,13 @@ def call_ai(client: Groq, question: str, settings: Settings) -> ChatCompletion: 
 
 - **La función de dominio no imprime ni llama a `SystemExit`.** Solo invoca la API y devuelve la respuesta (o deja propagar la excepción tipada de Groq).
 - **`main` es el límite de presentación y salida**: captura las excepciones específicas y, al final, `GroqError`, y las mapea a mensajes amigables y a un `return`, sin `raise` ni `SystemExit` en la capa de dominio.
+
+## Nota técnica: jerarquía de captura
+
+- **Especifico→genérico:** los `except` van del más específico al más genérico. `AuthenticationError`, `RateLimitError`, `NotFoundError` (subclases de `APIStatusError`) van primero; luego `APIConnectionError`; finalmente `GroqError`. Si se invierte el orden, los genéricos capturan antes de llegar a los específicos.
+- **`APIConnectionError` vs `APIStatusError`:** `APIConnectionError` se lanza cuando no hay respuesta HTTP del proveedor (red caída, timeout) y su constructor recibe `message=` y `request=` separados. `APIStatusError` cubre respuestas con código de estado HTTP (4xx/5xx) — subclase de la que heredan `AuthenticationError`, `RateLimitError` y `NotFoundError` — y su constructor requiere `(message, *, response, body)` con un `httpx.Response` adjunto.
+- **Secretos:** los mensajes de usuario no deben incluir el detalle crudo de la excepción del proveedor (`f"...{exc}"`), porque puede contener tokens internos, IDs de respuesta o metadatos sensibles. Se usa un mensaje fijo genérico y el valor `SENSITIVE_PROVIDER_DETAIL` solo como marcador de prueba.
+- **Reintentos:** no hay política de retry implementada; se confía en el reintento nativo del SDK (`max_retries` por defecto). No se añade bucle manual ni lógica de backoff propia.
 
 ## Prohibiciones explícitas (verificadas como ausentes)
 
@@ -315,7 +322,7 @@ def test_main_handles_specific_groq_errors_safely(
     assert "SENSITIVE_PROVIDER_DETAIL" not in captured.out
 ```
 
-Total del archivo: **6 casos** (1 propagación + 1 genérico + 4 parametrizados). Suite completa: **14 tests**.
+Total del archivo: **6 casos** (1 propagación + 1 genérico + 4 parametrizados). Checkpoint acumulado: **14 tests**.
 
 ## `temperature` y `top_p`
 
@@ -329,11 +336,11 @@ El código usa `temperature=0.7` y `top_p=0.9`, ambos válidos para `openai/gpt-
 
 | Comando | Resultado |
 | --- | --- |
-| `uv run ruff format --check .` | 14 files already formatted (limpio) |
+| `uv run ruff format --check .` | limpio |
 | `uv run ruff check .` | All checks passed |
-| `uv run mypy src tests --strict` | Success: no issues found in 7 source files |
+| `uv run mypy src tests --strict` | Success: no issues found |
 | `uv run pytest tests/test_hello_ai.py -q` | 6 passed |
-| `uv run pytest -q` | 14 passed |
+| `uv run pytest -q` | 14 passed en este checkpoint |
 
 No se realizaron llamadas reales a la API para validar el manejo de errores (cero cuota, cero red).
 
@@ -350,7 +357,7 @@ No se realizaron llamadas reales a la API para validar el manejo de errores (cer
 - [x] Las pruebas usan `MagicMock` con `side_effect` y helpers seguros de excepciones (request adjunto para errores de estado; `message=`+`request=` para conexión).
 - [x] El manejador genérico es el mensaje fijo y no imprime detalles crudos del proveedor.
 - [x] `Settings.model_construct` solo en `tests/`, nunca en `src/`.
-- [x] `ruff format --check .`, `ruff check .`, `mypy src tests --strict` y `pytest` en verde (6 + 14).
+- [x] Ruff, mypy y **14 tests acumulados** en verde.
 - [x] [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) completo y sincronizado (prerrequisito cumplido).
 
 ## Comandos
@@ -363,20 +370,9 @@ uv run pytest tests/test_hello_ai.py -q
 uv run pytest -q
 ```
 
-## Estado actual
+## Resultado de etapa y siguiente paso
 
-- Lección **Completed** e implementada; verificada offline (vide supra).
-- La secuencia es costo (02-05) → errores (02-06) → temperatura (02-07).
-- `tests/test_hello_ai.py` añadido (nuevo, sin rastrear en este estado); `hello_ai.py` modificado para extraer `call_ai` y añadir el manejo de `GroqError`.
-
-## Next step
-
-1. Verificación offline final (ya ejecutada: ruff/mypy/pytest en verde).
-2. Opcional: una sola llamada real exitosa a la API para confirmar el flujo feliz (consumo de cuota; **nunca** provocar errores a propósito).
-3. Revisión y commit de `src/python_applied_ai/hello_ai.py`, `tests/test_hello_ai.py` y este documento; luego sincronizar con `origin/main`.
-4. Continuar con [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md).
-
-No se realiza commit ni push en este paso; queda a decisión del usuario.
+`call_ai` queda separado del límite de presentación; los errores específicos se traducen a mensajes seguros y los **14 tests acumulados** están verdes. Continúe con [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md) para convertir el muestreo en configuración validada.
 
 ## Mensaje de commit sugerido
 

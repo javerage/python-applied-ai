@@ -4,7 +4,7 @@
 
 ## Estado
 
-**Completed** — el andamiaje inicial se completó y se publicó en `origin/main` (commit `e263249`).
+**Completed — etapa 1 de 9.** Esta guía crea únicamente el andamiaje reproducible. Parte de un repositorio clonado y termina con un paquete importable, herramientas de calidad y **1 test** de humo. No adelanta configuración de costo, temperatura, chatbot ni CLI.
 
 ## Objetivo de aprendizaje
 
@@ -14,9 +14,9 @@ Crear un proyecto Python reproducible, aislado y listo para integrar modelos de 
 
 1. Usar el repositorio ya clonado (no ejecutar un segundo `git init`).
 2. Instalar el intérprete de proyecto: `uv python install 3.13` y `uv sync`.
-3. Copiar la plantilla de entorno: `cp .env.example .env` y completar los secretos.
+3. Crear la plantilla `.env.example`; la API key se incorpora de forma segura en 02-03.
 4. Ejecutar las comprobaciones: `uv run pytest`, `uv run ruff format .`, `uv run ruff check .`, `uv run mypy src`.
-5. (Ya realizado) Confirmar árbol de trabajo limpio y publicar con un commit convencional.
+5. Confirmar que el test de importación está verde y continuar con 02-03.
 
 ## Resumen del concepto del instructor
 
@@ -84,6 +84,7 @@ data/generated/          # artefactos regenerables, nunca commiteados
 ```text
 LLM_PROVIDER=groq
 LLM_MODEL=openai/gpt-oss-20b
+LLM_MAX_TOKENS=256
 
 GROQ_API_KEY=
 GOOGLE_API_KEY=
@@ -91,7 +92,10 @@ OPENAI_API_KEY=
 
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.1:latest
+
 ```
+
+> Esta es la fotografía de la etapa 02-02. Las tarifas se añaden en 02-05 y `LLM_TEMPERATURE` en 02-07. `.env.example` es rastreado y nunca contiene secretos; `.env` es privado e ignorado.
 
 ### Configuración de herramientas en `pyproject.toml`
 
@@ -99,20 +103,26 @@ OLLAMA_MODEL=llama3.1:latest
 - `ruff` con `line-length = 100`, `target-version = "py313"` y reglas `E, F, I, B, UP`.
 - `mypy` en modo `strict`, `python_version = "3.13"`.
 
-### Prueba de humo
+### Prueba de humo y entrypoint
 
-`tests/test_package.py` importa el paquete y afirma su nombre, lo que valida que la instalación editable funciona.
+`tests/test_package.py` importa el paquete, lo que valida la instalación editable. El entrypoint se reserva como límite de composición y se conecta al chatbot completo recién en 02-10.
 
 ## Verificación y checklist
 
-- [x] `uv run pytest` pasa.
+- [x] `uv run pytest -q` pasa **1 test** de importación.
 - [x] `uv run ruff format .` y `uv run ruff check .` sin errores.
 - [x] `uv run mypy src` sin errores (modo strict).
 - [x] `git check-ignore -v .env` confirma que `.env` está ignorado.
 - [x] `.env.example`, `uv.lock` y los `.gitkeep` están rastreados; `.env` y `.venv` no.
-- [x] Commit `e263249` publicado en `origin/main`; árbol de trabajo limpio.
+- [x] El hito histórico `e263249` representa este andamiaje.
 
-## Decisiones, trade-offs y errores comunes
+## Nota técnica: uv, src-layout, entrypoint y archivos de entorno
+
+- **`uv`**: gestor de proyecto y entorno que produce `uv.lock` para reproducibilidad. Comandos canónicos: `uv run pytest -q`, `uv run ruff format --check .`, `uv run ruff check src tests`, `uv run mypy src tests`. No use `pip`/`venv` directamente.
+- **`src-layout`**: el paquete vive bajo `src/python_applied_ai/`. El intérprete se resuelve desde la raíz del repositorio (`uv run python -m python_applied_ai.hello_ai`), lo que hace que `.env` se cargue por el directorio de trabajo actual.
+- **Entrypoint**: `pyproject.toml` expone `python-applied-ai = "python_applied_ai:main"`. El punto de entrada ejecutable se prueba con `uv run python-applied-ai`. No hay un segundo `git init`; el repositorio ya estaba clonado y conectado a `origin`.
+- **`.env` vs `.env.example`**: `.env.example` es la plantilla rastreada en Git (placeholders en blanco, sin secretos). `.env` es privado, ignorado por Git (`.gitignore` contiene `.env`), y nunca se commitea. `pydantic-settings` carga `.env` directamente en `Settings`; no use `load_dotenv` ni `os.environ` para validar.
+- **Verificación del scaffold**: `git check-ignore -v .env` confirma que `.env` está ignorado; `uv run pytest -q` valida que la instalación editable funciona; `uv run ruff format --check .` y `uv run ruff check .` validan formato/lint; `uv run mypy src` valida tipos strict.
 
 - **`uv` frente a `pip`/`venv`:** mayor reproducibilidad (`uv.lock`) y un intérprete aislado, a cambio de aprender una nueva herramienta.
 - **`pydantic-settings` frente a `python-dotenv` + `pydantic`:** configuración tipada y validada en un solo lugar.
@@ -121,9 +131,9 @@ OLLAMA_MODEL=llama3.1:latest
 - **Sin secretos en archivos rastreados:** `.env` nunca se commitea; solo `.env.example` con valores en blanco.
 - **Sin segundo `git init`:** el repositorio ya estaba clonado y conectado a `origin`.
 
-## Estado actual y siguiente paso
+## Resultado de etapa y siguiente paso
 
-El andamiaje está completo y verificado. La cuenta y la API key de Groq ya están listas (ver `02-03-groq-account-api-key.md`). El siguiente paso es implementar la configuración tipada y la primera llamada a la API de Groq (ver `02-04-first-groq-api-call.md`).
+El repositorio queda importable y reproducible con 1 test. Continúe con [02-03-groq-account-api-key.md](./02-03-groq-account-api-key.md) para configurar el secreto sin exponerlo.
 
 ## Referencias externas oficiales
 

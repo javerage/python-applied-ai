@@ -6,42 +6,44 @@
 
 ## Estado
 
-**Completed** — lección de la sección 2 (Parte 1 de la historia de conversación). Prerrequisitos:
+**Completed — etapa 7 de 9.** Parte del checkpoint de 46 tests de 02-07 y crea el dominio `ChatBot` con historial transaccional. Añade 5 pruebas offline y deja **51 tests acumulados**. Prerrequisitos:
 
-- [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) **completado e implementado** (define `call_ai`, el límite de errores y el patrón de cliente inyectado).
-- [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md) **revisado/completado conceptualmente antes de implementar** (temperatura, semilla, límites de cuota).
+- [02-05-token-usage-and-cost-estimation.md](./02-05-token-usage-and-cost-estimation.md) Completed.
+- [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) Completed e implementado (define `call_ai`, el límite de errores y el patrón de cliente inyectado).
+- [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md) Completed; validación y experimento controlado implementados offline.
 
-La implementación base está en `src/python_applied_ai/chatbot_cli.py` y sus pruebas offline en `tests/test_chatbot_cli.py`. Las 5 pruebas originales de esta lección (T1–T5) siguen presentes; el archivo `tests/test_chatbot_cli.py` ahora suma **13** (5 heredados de 02-08 + 8 agregados por 02-09) y la suite completa es **27 passed**. Evidencia verificada: `ruff format --check .` y `ruff check .` limpios; `mypy src tests` sin errores en 9 archivos; `pytest tests/test_chatbot_cli.py -q` = 13 passed; `pytest -q` = 27 passed. No se hizo llamada en vivo: la validación de esta Parte 1 es offline.
+La etapa introduce 5 pruebas T1–T5 en `tests/test_chatbot_cli.py`; todas son offline. Las 25 pruebas posteriores del mismo archivo pertenecen a 02-09/02-10 y no forman parte de este checkpoint.
 
 ## Roadmap del proyecto (tres videos)
 
-El proyecto de chatbot en CLI abarca **tres videos** del curso. Esta guía (02-08) corresponde al **video 1** (clase de dominio `ChatBot` + historial + `chat`). Las transcripciones de los videos 2 y 3 confirmaron las siguientes etapas; sus guías siguen planificadas hasta implementar el código.
+El proyecto de chatbot CLI se construye en tres incrementos consecutivos:
 
-| Guía | Video | Título de trabajo (provisional) | Contenido exacto |
+| Guía | Video | Título de trabajo | Contenido exacto |
 | --- | --- | --- | --- |
-| 02-08 (esta) | Video 1 | Clase de dominio con historial | Implementado y verificado offline |
-| 02-09 | Video 2 | Uso, costo teórico y estadísticas de sesión | Implementado y verificado offline |
-| 02-10 | Video 3 | Bucle CLI e integración final | Planificado |
+| 02-08 (esta) | Video 1 | Clase de dominio con historial | Se implementa ahora |
+| 02-09 | Video 2 | Uso, costo teórico y estadísticas de sesión | Siguiente incremento |
+| 02-10 | Video 3 | Bucle CLI e integración final | Cierre del producto |
 
-> **Límite de alcance:** 02-09 **ya agregó** (en su propia guía, verificado offline) las estadísticas de sesión y el costo teórico; 02-10 (todavía **Planificado**) integrará el bucle de terminal y `format_stats`. Las capacidades de 02-10 no forman parte del código completado en esta guía.
+> **Límite de alcance:** esta guía no crea estadísticas acumuladas, comandos de terminal ni entrypoint final. Esas responsabilidades se añaden en 02-09 y 02-10.
 
 ## Ruta rápida (primero el resultado)
 
 1. (Hecho) [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) — cliente inyectado y manejo de errores.
-2. (Hecho) [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md) — parámetros de muestreo y conciencia de cuota.
+2. (Hecho) [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md) — Completed.
 3. **(Hecho) Esta Parte 1:** crear la clase de dominio `ChatBot` con `history` tipado y `chat()` transaccional.
-4. **(Completado y verificado offline en 02-09):** el seguimiento de costo/estadísticas de sesión ya está implementado (`chat` ahora devuelve `ChatTurn` con `usage`, y existen `stats()`/`reset_session()`). El bucle de CLI de integración final sigue reservado para **02-10** (Planificado).
+4. **(Siguiente, 02-09):** extender el resultado con uso y estadísticas de sesión.
+5. **(Cierre, 02-10):** integrar el bucle CLI, comandos y entrypoint.
 
 **Resultado de esta lección:** un objeto `ChatBot` que recuerda la conversación (system + user + assistant) y la reenvía en cada turno, con errores de Groq que se propagan al límite, igual que en 02-06.
 
 ## Límite explícito de la lección
 
-| Esta Parte 1 (se crea) | Diferido (02-09 / 02-10, por confirmar) |
+| Esta Parte 1 (se crea) | Se difiere deliberadamente |
 | --- | --- |
-| Clase de dominio `ChatBot` | Bucle interactivo de lectura/escritura en CLI (reservado 02-10) |
-| `history: list[ChatCompletionMessageParam]` | Banner/pulido de presentación (02-10; el seguimiento de uso/costo ya lo aportó 02-09) |
-| `chat(user_message) -> ChatTurn` | Seguimiento acumulado de `total_tokens` / costo (implementado en 02-09) |
-| Inyección del cliente Groq y `Settings` | Persistencia en disco / RAG (reservado, por confirmar) |
+| Clase de dominio `ChatBot` | Bucle interactivo de lectura/escritura (02-10) |
+| `history: list[ChatCompletionMessageParam]` | Presentación y comandos (02-10) |
+| `chat(user_message) -> str` | `ChatTurn`, tokens y costo acumulado (02-09) |
+| Inyección del cliente Groq y `Settings` | Persistencia en disco / RAG (por confirmar) |
 
 No implemente el bucle de CLI ni el banner en esta lección: mantenga el alcance en la clase de dominio para poder probarla 100% offline.
 
@@ -65,8 +67,8 @@ El Gist de arranque usa OpenAI con valores hardcodeados. Esta guía lo reescribe
 | `load_dotenv()` + `os.getenv(...)` | `Settings` (pydantic-settings) vía `get_settings()`; en tests `Settings.model_construct` |
 | Modelo como string literal fijo | `settings.llm_model` |
 | System prompt en español escrito en el código | Parámetro del constructor `system_prompt: str` (no se copia el texto original) |
-| Tarifas `float` hardcodeadas | `Decimal` **opcional** en `Settings` + `cost.py` (implementado en 02-09) |
-| `main`/banner sin tipos | Límite tipado diferido a 02-10 (bucle de CLI; banner por confirmar) |
+| Tarifas `float` hardcodeadas | `Decimal` opcional ya preparado en 02-05; acumulación llega en 02-09 |
+| `main`/banner sin tipos | Límite de composición reservado para 02-10 |
 | **No existe clase `ChatBot`** | `ChatBot` es aporte de la lección (dominio + historial + `chat`) |
 
 ## Advertencia de comparación con la implementación pública final
@@ -82,7 +84,7 @@ Existe un repositorio público final del curso (citado una vez en Referencias ex
 | `except Exception` amplio | Errores específicos de Groq (como 02-06) |
 | Sin pruebas | TDD offline (MagicMock/`cast`, `Settings.model_construct`) |
 
-No copie el acoplamiento OpenAI, los efectos de `dotenv`, el modelo/tarifas hardcodeados, el historial ilimitado, el `Exception` amplio ni la ausencia de pruebas. No adelante aquí detalles de implementación de los videos 2/3.
+No copie el acoplamiento OpenAI, los efectos de `dotenv`, valores hardcodeados, historial ilimitado, `Exception` amplio ni ausencia de pruebas. No adelante aquí las responsabilidades de 02-09/02-10.
 
 ## Conceptos correctos y correcciones
 
@@ -131,16 +133,16 @@ Decisión del análisis aprobado: si `response.choices[0].message.content` es `N
 
 - `model=settings.llm_model`
 - `max_tokens=settings.llm_max_tokens` (actualmente soportado)
-- `temperature=0.7` (valor por defecto coherente con 02-06/02-07)
+- `temperature=validate_temperature(settings.llm_temperature)` (configuración introducida en 02-07)
 - `top_p=0.9` (coherente con 02-06)
 
-> **Nota de migración (`max_tokens`):** en los tipos del SDK, `max_tokens` está **deprecado** a favor de `max_completion_tokens`. En `openai/gpt-oss-20b` los **tokens de razonamiento cuentan dentro del presupuesto de `completion_tokens`**. Esta guía mantiene `max_tokens` para compatibilidad con el proyecto actual y **agenda la migración a `max_completion_tokens` en 02-09+**. No cambie el comportamiento hoy sin revisar el presupuesto de completación.
+> **Nota de migración (`max_tokens`):** en los tipos del SDK, `max_tokens` está **deprecado** a favor de `max_completion_tokens`. En `openai/gpt-oss-20b` los **tokens de razonamiento cuentan dentro del presupuesto de `completion_tokens`**. Esta guía mantiene `max_tokens` para compatibilidad con el proyecto actual; evalúe la migración a `max_completion_tokens` sin prisa y sin cambiar el comportamiento hoy.
 
-### Por qué NO se añaden `total_tokens` / `total_cost` muertos
+### `total_tokens` / `total_cost`
 
-- No se sumaban tokens ni costo en esta Parte 1: el **seguimiento acumulado** ya está implementado en 02-09 (ver su guía; `chat` ahora devuelve `ChatTurn` con `usage` y `stats()`/`reset_session()` exponen `SessionStats`).
+- El seguimiento acumulado de tokens/costo se difiere a 02-09; el bucle y `format_stats`, a 02-10.
 - El costo usa `Decimal` (en `cost.py`), **nunca `float`**, para evitar errores de redondeo de moneda. Las tarifas son `Decimal | None` opcionales en `Settings`; hoy no se exige su configuración.
-- Añadir contadores "muertos" aquí duplicaría responsabilidad y rompería el límite de la lección.
+- El `system_prompt` pedagógico es `You are a helpful Python and AI assistant.`; en tests use un fixture aislado (no mezcle el prompt de producción con el de test).
 
 ### `chatbot_cli.py` (implementación)
 
@@ -154,6 +156,7 @@ from groq.types.chat import (
 )
 
 from python_applied_ai.config import Settings
+from python_applied_ai.sampling import validate_temperature
 
 
 class ChatBot:
@@ -174,7 +177,7 @@ class ChatBot:
             model=self.settings.llm_model,
             messages=pending_history,
             max_tokens=self.settings.llm_max_tokens,
-            temperature=0.7,
+            temperature=validate_temperature(self.settings.llm_temperature),
             top_p=0.9,
         )
         content = response.choices[0].message.content or ""
@@ -363,12 +366,12 @@ def test_empty_content_returns_empty_string_and_commits() -> None:
     assert assistant["content"] == ""
 ```
 
-> Total de la lección (Parte 1): **5 casos originales** (T1–T5), todos offline, que siguen en `tests/test_chatbot_cli.py`. El archivo completo ahora tiene **13** (5 de 02-08 + 8 de 02-09) y la suite **27**. El bucle de CLI y `format_stats` se reservan para 02-10 (Planificado).
+> Esta etapa añade **5 casos** T1–T5, todos offline. Sumados al checkpoint de 02-07, quedan **51 tests acumulados**.
 
 ## Procedimiento manual de aprendizaje
 
-1. Confirme [02-06-groq-api-error-handling.md](./02-06-groq-api-error-handling.md) implementado y [02-07-temperature-and-reproducibility.md](./02-07-temperature-and-reproducibility.md) revisado.
-2. Revise `src/python_applied_ai/chatbot_cli.py`: la clase `ChatBot` ya implementa el contrato anterior.
+1. Confirme 02-05, 02-06 y 02-07 Completed.
+2. Implemente únicamente `ChatBot`, historial y `chat() -> str`; no copie todavía `ChatTurn`, estadísticas ni bucle CLI del árbol final.
 3. Revise `tests/test_chatbot_cli.py`: T1–T5 son pruebas offline de comportamiento y caracterización.
 4. Ejecute `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy src tests`, `uv run pytest tests/test_chatbot_cli.py -q` y `uv run pytest -q`.
 5. Una llamada en vivo es opcional y consume cuota; no se ejecutó para esta Parte 1 y nunca se deben provocar errores a propósito.
@@ -395,19 +398,19 @@ def test_empty_content_returns_empty_string_and_commits() -> None:
 - Hardcodear el modelo/system prompt/tarifas en la clase (rompe provider-neutrality).
 - Usar `float` para tarifas o costo (error de redondeo de moneda).
 - Pretender que RAG reemplaza la memoria de chat.
-- Crear el bucle de CLI o el banner en esta lección (corresponde a 02-10, por confirmar).
+- Crear el bucle de CLI o el banner en esta lección (corresponde a 02-10).
 
 ## Checklist de aceptación
 
 - [x] `ChatBot.__init__(client: Groq, settings: Settings, system_prompt: str)` inyecta cliente y settings.
 - [x] `history` empieza en `[system]` (rol `system`, contenido = `system_prompt`).
 - [x] `chat` construye `pending` sin mutar `history` y confirma user+assistant solo tras éxito.
-- [x] `chat` usa `settings.llm_model`, `settings.llm_max_tokens`, `temperature=0.7`, `top_p=0.9`.
+- [x] `chat` usa modelo, límite y temperatura desde `Settings`; `top_p=0.9` permanece fijo en esta sección.
 - [x] Los errores de Groq se propagan al límite (no se capturan en dominio).
 - [x] `content is None` → devuelve `""` y confirma assistant con `""` (contrato T5).
-- [x] Sin `total_tokens`/`total_cost` muertos; costo futuro con `Decimal` en 02-09.
+- [x] Sin contadores muertos ni responsabilidades adelantadas de 02-09/02-10.
 - [x] Pruebas T1–T5 offline (MagicMock/`cast`, `Settings.model_construct`); cero red/cuota.
-- [x] Verificado con `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy src tests`, 13 pruebas dirigidas (5 de esta lección + 8 de 02-09) y 27 pruebas totales.
+- [x] 5 pruebas nuevas del chatbot y **51 tests acumulados** en verde.
 - [x] No se copió código del Gist ni del curso de pago.
 
 ## Comandos de verificación
@@ -416,10 +419,8 @@ def test_empty_content_returns_empty_string_and_commits() -> None:
 uv run ruff format --check .
 uv run ruff check .
 uv run mypy src tests
-uv run pytest tests/test_chatbot_cli.py -q   # 13 passed
-uv run pytest -q                            # 27 passed
-# Confirmación en vivo (opcional, consume cuota; no ejecutada en esta Parte 1):
-# El bucle CLI ejecutable se difiere a 02-10 (Planificado).
+uv run pytest tests/test_chatbot_cli.py -q   # 5 tests en esta etapa
+uv run pytest -q                            # 51 tests acumulados
 ```
 
 ## Rollback / límite de parada
@@ -427,11 +428,10 @@ uv run pytest -q                            # 27 passed
 - Si `mypy --strict` falla por tipos de historial, use `cast(...)` a la TypedDict concreta (ver tests).
 - Si una llamada en vivo falla, **deténgase**; no agregue bucles ni reintentos manuales (el SDK reintenta por sí solo).
 - No edite `.env` ni desactive la red para "provocar" fallos: use el cliente falso en pruebas.
-- Esta lección **no** debe crear el bucle CLI ni el banner; si lo necesita, es alcance de 02-10 (por confirmar).
 
 ## Siguiente paso
 
-Esta Parte 1 (`ChatBot` e historial) y la Parte 2 (**02-09**, uso/costo/estadísticas de sesión) están completadas y verificadas offline. El siguiente paso es **02-10** (Planificado): el bucle CLI e integración final con `format_stats`.
+El chatbot ya mantiene historial de forma transaccional y consume `settings.llm_temperature`. Continúe con [02-09-cli-chatbot-session-usage-and-cost.md](./02-09-cli-chatbot-session-usage-and-cost.md) para añadir `ChatTurn` y estadísticas sin contaminar el dominio con presentación.
 
 ## Referencias externas oficiales
 

@@ -22,6 +22,7 @@ from groq.types.completion_usage import CompletionUsage
 
 from python_applied_ai.config import Settings
 from python_applied_ai.cost import estimate_cost_usd
+from python_applied_ai.sampling import validate_temperature
 
 EXIT_COMMANDS: frozenset[str] = frozenset({"quit", "exit", "salir", "bye"})
 
@@ -126,7 +127,7 @@ class ChatBot:
             model=self.settings.llm_model,
             messages=pending_history,
             max_tokens=self.settings.llm_max_tokens,
-            temperature=0.7,
+            temperature=validate_temperature(self.settings.llm_temperature),
             top_p=0.9,
         )
 

@@ -15,6 +15,7 @@ from groq.types.completion_usage import CompletionUsage
 
 from python_applied_ai.config import Settings, get_settings
 from python_applied_ai.cost import estimate_cost_usd
+from python_applied_ai.sampling import validate_temperature
 
 
 def format_usd(cost: Decimal) -> str:
@@ -81,14 +82,21 @@ def call_ai(
     client: Groq,
     question: str,
     settings: Settings,
+    temperature: float = 0.7,
+    seed: int | None = None,
 ) -> ChatCompletion:
-    """Call Groq and return the complete chat response."""
+    """Call Groq and return the complete chat response.
+
+    Extends the 02-06 signature with optional `temperature` (default 0.7).
+    The domain does not print or call SystemExit.
+    """
 
     return client.chat.completions.create(
         model=settings.llm_model,
         messages=[{"role": "user", "content": question}],
         max_tokens=settings.llm_max_tokens,
-        temperature=0.7,
+        temperature=validate_temperature(temperature),
+        seed=seed,
         top_p=0.9,
     )
 
@@ -108,6 +116,7 @@ def main() -> None:
             client,
             "Say hello in three languages: Spanish, English, and French.",
             settings,
+            temperature=settings.llm_temperature,
         )
     except AuthenticationError:
         print("Authentication failed: GROQ_API_KEY is invalid or revoked.")

@@ -4,11 +4,13 @@
 
 ## Estado
 
-**Completado** — tercera y última parte del proyecto CLI. El núcleo del dominio (`ChatBot`, `ChatTurn`, `SessionStats`, `format_stats`), el bucle `run_cli` y el cableado del punto de entrada ejecutable están implementados y verificados offline (46 tests verdes; Ruff format/lint, mypy y diff checks limpios). El smoke test en vivo confirmó el flujo interactivo completo: `uv run python-applied-ai` abrió `You:`, la primera consulta real respondió, `/stats` y `/reset` funcionaron, y `exit` imprimió las estadísticas finales exactamente una vez y volvió a consola. Requiere [02-08-cli-chatbot-conversation-history.md](./02-08-cli-chatbot-conversation-history.md) y el contrato de resultados/estadísticas **ya implementado** en [02-09-cli-chatbot-session-usage-and-cost.md](./02-09-cli-chatbot-session-usage-and-cost.md).
+**Completed — etapa 9 de 9.** Parte de los 59 tests de 02-09 y conecta dominio, configuración, comandos y entrypoint en un único chatbot CLI. Añade 17 casos del bucle y 2 del punto de composición; el producto final queda en **78 tests**. El smoke test live histórico confirmó conversación, `/stats`, `/reset` y salida limpia.
 
 ## Resultado esperado
 
 Una función de ejecución de terminal testable recibe entradas normalizadas, llama solo a las APIs públicas de `ChatBot`, muestra respuestas y estadísticas seguras, y finaliza de forma predecible ante comandos, EOF, Ctrl+C o errores tipados de Groq. El punto de entrada ejecutable (`python-applied-ai`) debe orquestar la construcción del borde sin exponer credenciales ni detalles crudos del proveedor.
+
+La composición final conserva una sola fuente de verdad: `get_settings()` carga modelo, límite, temperatura y tarifas; `ChatBot` consume esos valores y valida `llm_temperature` antes de llamar a Groq. El CLI no conoce ni duplica esos parámetros.
 
 ## Ruta rápida
 
@@ -37,7 +39,7 @@ El dominio conserva historial y estadísticas. La terminal solo coordina entrada
 ```python
 # Implementado en src/python_applied_ai/chatbot_cli.py (02-10):
 # run_cli y format_stats; stats() y reset_session() ya existen (02-09).
-# Pruebas del núcleo: 46 verdes (02-10).
+# Checkpoint final de la sección 02: 78 tests.
 from collections.abc import Callable
 
 from groq import (
@@ -146,7 +148,7 @@ Una completación completa contiene texto y uso; el texto solo es un `str`. Pasa
 
 No se usa `except Exception`, `sleep`, reintento manual ni salida forzada del proceso. `KeyboardInterrupt` y `EOFError` son condiciones de interfaz, no errores de proveedor.
 
-Las pruebas de `tests/test_chatbot_cli.py` cubren el bucle `run_cli` (salida, `/stats`, `/reset`, turno normal, errores tipados, EOF, `KeyboardInterrupt`) de forma 100 % offline. La cobertura del slice de integración del punto de entrada se describe a continuación. Pruebas del núcleo: 46 verdes.
+Las 30 pruebas finales de `tests/test_chatbot_cli.py` reúnen 5 casos de historial, 8 de estadísticas y 17 del bucle CLI. Dos casos adicionales de `test_package.py` verifican la composición. La suite final alcanza **78 tests**, todos offline.
 
 ## Plan TDD / aceptación para el slice de integración *(histórico — verificación completada)*
 
@@ -195,11 +197,13 @@ Resultados no deterministas: el cuerpo de la respuesta del modelo varía; las es
 ### Resultado verificado (smoke test en vivo)
 
 - `uv run python-applied-ai` abrió el prompt `You:` sin errores de importación ni configuración.
-- Primera consulta real: el modelo respondió; `/stats` mostró `Turns 1`, 93/72/165 tokens, costo 0.000028575.
+- Primera consulta real: el modelo respondió; `/stats` mostró `Turns: 1`, 93/72/165 tokens, costo 0.000028575.
 - `/reset` respondió `Conversation reset.`.
-- Segunda consulta real: el modelo respondió; `/stats` mostró `Turns 1`, 91/256/347 tokens, costo 0.000083625.
+- Segunda consulta real: el modelo respondió; `/stats` mostró `Turns: 1`, 91/256/347 tokens, costo 0.000083625.
 - `exit` imprimió las estadísticas finales exactamente una vez y regresó a la consola.
 - **Límite esperado `LLM_MAX_TOKENS=256`:** el completion de 256 tokens alcanzó el tope configurado; es un límite esperado, no un error. El comportamiento se ajusta a la configuración del modelo.
+
+> **Nota:** los tokens, costos y respuestas live son observaciones temporales de una ejecución concreta, no golden outputs. Verifique el formato y la presencia de las secciones, no los valores numéricos o de texto exactos.
 
 No se copiaron respuestas del modelo ni credenciales en esta guía; la clave (`GROQ_API_KEY`) permanece fuera del documento.
 
@@ -213,7 +217,7 @@ No se copiaron respuestas del modelo ni credenciales en esta guía; la clave (`G
 - [x] El resumen final aparece una vez para salida normal, EOF o Ctrl+C.
 - [x] Todas las pruebas del bucle son offline; no hay `except Exception` ni reintentos manuales.
 - [x] `format_stats` implementado y verificado en `chatbot_cli.py`.
-- [x] Ruff, mypy y pytest pasan en el núcleo del dominio (46 tests).
+- [x] Ruff, mypy y **78 tests** pasan en el producto final.
 - [x] `hello_ai.py::main` documentado como función de llamada única, no sustituto del bucle.
 - [x] Punto de entrada `python-applied-ai` ejecuta el bucle CLI completo.
 - [x] Test offline de `main` con inyección/mocks antes de smoke test en vivo.
@@ -227,12 +231,12 @@ No se copiaron respuestas del modelo ni credenciales en esta guía; la clave (`G
 uv run ruff format --check .
 uv run ruff check src tests
 uv run mypy src tests
-uv run pytest -q
+uv run pytest -q  # 78 tests: producto final de la sección 02
 ```
 
 ## Siguiente paso
 
-Cierre del work unit: confirmar `git diff --check`, registrar el commit del slice 02-10 y continuar con la siguiente guía del curso. No se inventa contenido de guía inexistente; se sigue el orden establecido en el repositorio.
+La sección 02 queda cerrada con un único producto integrado: configuración tipada, muestreo validado, historial, estadísticas, costo y CLI. Revise el mapa en [02-00-section-roadmap.md](./02-00-section-roadmap.md). La sección 03 no forma parte de este work unit.
 
 ## Referencias oficiales
 

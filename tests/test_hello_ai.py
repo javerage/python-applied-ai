@@ -88,6 +88,7 @@ def _test_settings(
     groq_api_key: SecretStr | None = None,
     llm_model: str = "openai/gpt-oss-20b",
     llm_max_tokens: int = 256,
+    llm_temperature: float = 0.7,
 ) -> Settings:
     """Build trusted test settings without reading environment sources."""
 
@@ -95,6 +96,7 @@ def _test_settings(
         groq_api_key=groq_api_key,
         llm_model=llm_model,
         llm_max_tokens=llm_max_tokens,
+        llm_temperature=llm_temperature,
     )
 
 
@@ -118,6 +120,7 @@ def test_main_handles_unexpected_groq_error_safely(
 
     settings = _test_settings(
         groq_api_key=SecretStr("test-key"),
+        llm_temperature=1.2,
     )
     fake_client = MagicMock()
     fake_client.chat.completions.create.side_effect = GroqError("SENSITIVE_PROVIDER_DETAIL")
@@ -138,6 +141,7 @@ def test_main_handles_unexpected_groq_error_safely(
 
     assert "unexpected groq" in captured.out.lower()
     assert "SENSITIVE_PROVIDER_DETAIL" not in captured.out
+    assert fake_client.chat.completions.create.call_args.kwargs["temperature"] == 1.2
 
 
 @pytest.mark.parametrize(

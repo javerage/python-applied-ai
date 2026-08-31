@@ -30,12 +30,13 @@ from python_applied_ai.cost import estimate_cost_usd
 SYSTEM_PROMPT = "You are a helpful Python and AI assistant."
 
 
-def _test_settings() -> Settings:
+def _test_settings(*, llm_temperature: float = 0.7) -> Settings:
     """Build trusted settings without reading environment sources."""
 
     return Settings.model_construct(
         llm_model="openai/gpt-oss-20b",
         llm_max_tokens=256,
+        llm_temperature=llm_temperature,
     )
 
 
@@ -145,7 +146,7 @@ def test_initial_history_has_system_message() -> None:
 def test_first_chat_round_returns_reply_and_commits_history() -> None:
     """A successful chat round stores user and assistant messages."""
 
-    settings = _test_settings()
+    settings = _test_settings(llm_temperature=1.2)
     fake_client = MagicMock()
     fake_client.chat.completions.create.return_value = _fake_completion("Hello")
 
@@ -159,6 +160,7 @@ def test_first_chat_round_returns_reply_and_commits_history() -> None:
 
     assert reply.text == "Hello"
     fake_client.chat.completions.create.assert_called_once()
+    assert fake_client.chat.completions.create.call_args.kwargs["temperature"] == 1.2
 
     assert len(chatbot.history) == 3
 
