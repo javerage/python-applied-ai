@@ -4,7 +4,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from groq import Groq
+from groq import (
+    APIConnectionError,
+    AuthenticationError,
+    Groq,
+    GroqError,
+    NotFoundError,
+    RateLimitError,
+)
 from groq.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageParam,
@@ -193,7 +200,12 @@ def run_cli(
 
     try:
         while True:
-            raw_input = input_fn("You: ")
+            try:
+                raw_input = input_fn("You: ")
+            except EOFError:
+                output_fn("Input closed. Ending session.")
+                break
+
             command = raw_input.strip()
             normalized = command.lower()
 
@@ -203,8 +215,30 @@ def run_cli(
             if normalized in EXIT_COMMANDS:
                 break
 
+            if normalized == "/reset":
+                bot.reset_session()
+                output_fn("Conversation reset.")
+                continue
+
             if normalized == "/stats":
                 output_fn(format_stats(bot.stats()))
                 continue
+
+            try:
+                turn = bot.chat(command)
+            except AuthenticationError:
+                output_fn("Authentication failed. Check the configured API key.")
+            except RateLimitError:
+                output_fn("Rate limit reached. Try again later; do not loop.")
+            except NotFoundError:
+                output_fn("Configured model was not found.")
+            except APIConnectionError:
+                output_fn("Connection error. Check the network and retry later.")
+            except GroqError:
+                output_fn("Unexpected Groq error. Try again later or check the status page.")
+            else:
+                output_fn(turn.text)
+    except KeyboardInterrupt:
+        output_fn("\nSession interrupted.")
     finally:
         output_fn(format_stats(bot.stats()))

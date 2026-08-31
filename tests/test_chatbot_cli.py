@@ -6,7 +6,14 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-from groq import APIConnectionError, Groq
+from groq import (
+    APIConnectionError,
+    AuthenticationError,
+    Groq,
+    GroqError,
+    NotFoundError,
+    RateLimitError,
+)
 from groq.types.chat import (
     ChatCompletion,
     ChatCompletionAssistantMessageParam,
@@ -58,6 +65,57 @@ def _connection_error() -> APIConnectionError:
         message="Connection failed",
         request=_fake_request(),
     )
+
+
+def _auth_error() -> AuthenticationError:
+    """Create an offline authentication error."""
+
+    request = _fake_request()
+
+    return AuthenticationError(
+        "SENSITIVE_PROVIDER_DETAIL",
+        response=httpx.Response(
+            401,
+            request=request,
+        ),
+        body=None,
+    )
+
+
+def _rate_limit_error() -> RateLimitError:
+    """Create an offline rate limit error."""
+
+    request = _fake_request()
+
+    return RateLimitError(
+        "SENSITIVE_PROVIDER_DETAIL",
+        response=httpx.Response(
+            429,
+            request=request,
+        ),
+        body=None,
+    )
+
+
+def _not_found_error() -> NotFoundError:
+    """Create an offline model-not-found error."""
+
+    request = _fake_request()
+
+    return NotFoundError(
+        "SENSITIVE_PROVIDER_DETAIL",
+        response=httpx.Response(
+            404,
+            request=request,
+        ),
+        body=None,
+    )
+
+
+def _groq_error() -> GroqError:
+    """Create an offline generic Groq error."""
+
+    return GroqError("SENSITIVE_PROVIDER_DETAIL")
 
 
 def test_initial_history_has_system_message() -> None:
@@ -691,5 +749,326 @@ def test_run_cli_prints_stats_on_stats_command() -> None:
 
     assert outputs == [
         chatbot_cli.format_stats(stats),
+        chatbot_cli.format_stats(stats),
+    ]
+
+
+def test_run_cli_resets_session_before_exit() -> None:
+    """Reset the session and print a fixed confirmation."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=["/reset", "exit"])
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    assert input_mock.call_count == 2
+    fake_bot.reset_session.assert_called_once_with()
+    fake_bot.chat.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [
+        "Conversation reset.",
+        chatbot_cli.format_stats(stats),
+    ]
+
+
+def test_run_cli_executes_normal_turn() -> None:
+    """A normal message calls chat and prints the reply text."""
+
+    usage = CompletionUsage(
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+    turn = chatbot_cli.ChatTurn(
+        text="Hello",
+        usage=usage,
+    )
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=1,
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+        theoretical_cost_usd=None,
+    )
+
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.chat.return_value = turn
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=["Hello", "exit"])
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    assert input_mock.call_count == 2
+    fake_bot.chat.assert_called_once_with("Hello")
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [
+        "Hello",
+        chatbot_cli.format_stats(stats),
+    ]
+
+
+def test_run_cli_eof_error_ends_session() -> None:
+    """EOFError ends the session without calling chat or reset."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=EOFError)
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    input_mock.assert_called_once_with("You: ")
+    fake_bot.chat.assert_not_called()
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [
+        "Input closed. Ending session.",
+        chatbot_cli.format_stats(stats),
+    ]
+
+
+def test_run_cli_authentication_error_continues_loop() -> None:
+    """Handle AuthenticationError safely and continue until exit."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.chat.side_effect = _auth_error()
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=["Hello", "exit"])
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    assert input_mock.call_count == 2
+    fake_bot.chat.assert_called_once_with("Hello")
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [
+        "Authentication failed. Check the configured API key.",
+        chatbot_cli.format_stats(stats),
+    ]
+
+
+def test_run_cli_rate_limit_error_continues_loop() -> None:
+    """Handle RateLimitError safely without retrying the provider."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.chat.side_effect = _rate_limit_error()
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=["Hello", "exit"])
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    assert input_mock.call_count == 2
+    fake_bot.chat.assert_called_once_with("Hello")
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [
+        "Rate limit reached. Try again later; do not loop.",
+        chatbot_cli.format_stats(stats),
+    ]
+
+
+def test_run_cli_not_found_error_continues_loop() -> None:
+    """Handle NotFoundError safely and continue until exit."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.chat.side_effect = _not_found_error()
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=["Hello", "exit"])
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    assert input_mock.call_count == 2
+    fake_bot.chat.assert_called_once_with("Hello")
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [
+        "Configured model was not found.",
+        chatbot_cli.format_stats(stats),
+    ]
+
+
+def test_run_cli_connection_error_continues_loop() -> None:
+    """Handle APIConnectionError safely and continue until exit."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.chat.side_effect = _connection_error()
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=["Hello", "exit"])
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    assert input_mock.call_count == 2
+    fake_bot.chat.assert_called_once_with("Hello")
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [
+        "Connection error. Check the network and retry later.",
+        chatbot_cli.format_stats(stats),
+    ]
+
+
+def test_run_cli_generic_groq_error_continues_loop() -> None:
+    """Handle a generic GroqError safely and continue until exit."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.chat.side_effect = _groq_error()
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=["Hello", "exit"])
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    assert input_mock.call_count == 2
+    fake_bot.chat.assert_called_once_with("Hello")
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [
+        "Unexpected Groq error. Try again later or check the status page.",
+        chatbot_cli.format_stats(stats),
+    ]
+
+
+def test_run_cli_keyboard_interrupt_ends_session() -> None:
+    """KeyboardInterrupt ends the session and prints its final summary."""
+
+    stats = chatbot_cli.SessionStats(
+        turn_count=0,
+        prompt_tokens=0,
+        completion_tokens=0,
+        total_tokens=0,
+        theoretical_cost_usd=None,
+    )
+
+    fake_bot = MagicMock(spec=ChatBot)
+    fake_bot.stats.return_value = stats
+
+    input_mock = MagicMock(side_effect=KeyboardInterrupt)
+    outputs: list[str] = []
+
+    chatbot_cli.run_cli(
+        cast(ChatBot, fake_bot),
+        input_fn=input_mock,
+        output_fn=outputs.append,
+    )
+
+    input_mock.assert_called_once_with("You: ")
+    fake_bot.chat.assert_not_called()
+    fake_bot.reset_session.assert_not_called()
+    fake_bot.stats.assert_called_once_with()
+
+    assert outputs == [
+        "\nSession interrupted.",
         chatbot_cli.format_stats(stats),
     ]
